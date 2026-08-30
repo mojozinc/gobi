@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  communication-gateway:
+    build: .
+    container_name: gobi-communication-gateway
+    ports:
+      - "8080:8080"
+    environment:
+      - PORT=8080
+      - ENV=production
+      - WHATSAPP_SESSION_DIR=/app/sessions
+      - WHATSAPP_LOG_LEVEL=INFO
+      - API_KEY=${API_KEY:-your-secret-api-key}
+    volumes:
+      - ./sessions:/app/sessions
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s

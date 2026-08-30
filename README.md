@@ -31,67 +31,101 @@ Modern health platforms often monetize or leak patient data, creating risks of i
 
 | Module | Description | Status |
 | --- | --- | --- |
-| **WhatsApp Bot Assistant** | Natural conversational interface for schedules, reminders, and inventory. | **Phase 1 (PoC)** |
-| **Dependent Management** | Dedicated profiles for up to 6 family members with distinct schedules. | Phase 2 |
+| **Mobile App Platform** | Flutter mobile app (iOS/Android) with authentication and navigation | ✅ **Phase 1 Complete** |
+| **Medication Management** | Track medications, set reminders, manage inventory | Phase 2 |
 | **Digital Report Archival** | Snap physical reports/prescriptions for OCR, indexing, and search. | Phase 2 |
-| **Consultation Transcription** | Voice recording of doctor visits with clinical term extraction & follow-up tracking. | Phase 3 |
-| **Secure Second Opinion Link** | Ephemeral, view-only links to share medical dossiers with consulting doctors. | Phase 3 |
+| **Dependent Management** | Dedicated profiles for up to 6 family members with distinct schedules. | Phase 3 |
+| **Consultation Transcription** | Voice recording of doctor visits with clinical term extraction & follow-up tracking. | Phase 4 |
+| **Secure Second Opinion Link** | Ephemeral, view-only links to share medical dossiers with consulting doctors. | Phase 4 |
 
 ---
 
-## 📱 Phase 1 PoC: WhatsApp Bot Interface
+## 📱 Phase 1 Complete: Mobile App Platform
 
-To rapidly test user interaction rates and gather behavioral data with minimal onboarding friction, Gobi begins as a **WhatsApp Bot**.
+Instead of WhatsApp (which has cost and reliability concerns), we've built a **native mobile application** using Flutter for both iOS and Android.
+
+### ✅ Implemented Features (Phase 1)
+
+- **Mobile App Foundation**
+  - Cross-platform Flutter app (iOS + Android)
+  - Beautiful, health-themed UI with Material Design 3
+  - Light and Dark mode support
+
+- **User Authentication**
+  - Secure registration and login
+  - JWT-based authentication
+  - Session persistence (auto-login)
+
+- **Dashboard & Navigation**
+  - Home screen with health overview
+  - Bottom navigation: Home, Medications, Documents, Family, Settings
+  - User profile management
+
+- **Backend API**
+  - RESTful Go API with Gin framework
+  - PostgreSQL database
+  - User authentication endpoints
+  - Profile management
+  - Docker-ready deployment
+
+### 🎯 Core Architecture
 
 ```mermaid
-flowchart LR
-    User([User on WhatsApp])
-    Bot[Gobi WhatsApp Bot Engine]
-    DB[(Sovereign Data Store)]
-    Sched[Scheduler / Reminder Queue]
+flowchart TB
+    User[Mobile App User]
+    App[Flutter Mobile App<br/>iOS & Android]
+    API[Go REST API<br/>Backend]
+    DB[(PostgreSQL<br/>Database)]
 
-    User -->|1. Setup Schedule & Stock| Bot
-    Bot -->|2. Persist Schedule & Inventory| DB
-    Sched -->|3. Trigger Dose Reminder| Bot
-    Bot -->|4. Push Reminder| User
-    User -->|5. Confirm Intake 'Taken'| Bot
-    Bot -->|6. Decrement Inventory & Log Adherence| DB
-    DB -->|7. Low Stock Trigger| Sched
-    Sched -->|8. Alert Refill Needed| Bot
-    Bot -->|9. Refill Alert| User
+    User -->|Interact| App
+    App -->|HTTP/JSON| API
+    API -->|SQL| DB
+
+    subgraph "Phase 1 - Complete"
+        App
+        API
+        DB
+    end
+
+    subgraph "Phase 2 - Coming Soon"
+        Notify[Push Notifications]
+        Scheduler[Medication Scheduler]
+        OCR[Document OCR]
+    end
 ```
 
-### Core PoC Use Cases
+### 🔮 Coming Next (Phase 2)
 
-1. **Medicine Schedule Ingestion**
-   - User communicates their prescription or supplement schedule in plain language (e.g., *"Metformin 500mg twice daily after meals, 30 pills in stock"*).
-   - The bot parses dosage, timing, and inventory count into structured records.
+1. **Medication Management**
+   - Add medications with dosage schedules
+   - Push notifications for medication reminders
+   - Inventory tracking with refill alerts
+   - Adherence tracking and history
 
-2. **Intake Reminders & Adherence Tracking**
-   - Scheduled interactive reminders sent directly to WhatsApp at dosing time.
-   - User responds with confirmation (*"Taken"*, *"Snooze 15m"*, *"Skipped"*).
-   - Tracks daily adherence rates to build compliance history.
-
-3. **Inventory & Refill Alerts**
-   - Decrements stock count on intake confirmation.
-   - Calculates remaining runway and sends proactive refill alerts before supplies run out (e.g., *"3 days of Metformin remaining. Time to reorder"*).
+2. **Document Scanning**
+   - Camera integration for scanning prescriptions
+   - OCR text extraction from medical reports
+   - Secure document storage and search
 
 ---
 
-## 📊 PoC Key Success Metrics
+## 🏗️ Technical Stack
 
-- **Reminder Interaction & Confirmation Rate:** % of push reminders responded to with intake confirmation within 60 minutes.
-- **Schedule Retention:** Consistency of daily adherence logging over a 14-day and 30-day window.
-- **Inventory Depletion Accuracy:** Correlation between bot-tracked pill inventory and actual user refill cycles.
+### Mobile App (Flutter)
+- **Framework:** Flutter 3.x
+- **Language:** Dart 3.x
+- **State Management:** Riverpod 2.x
+- **Networking:** Dio (HTTP client)
+- **Storage:** SharedPreferences, Hive
+- **UI:** Material Design 3, Google Fonts
 
----
-
-## 🏗️ Technical Architecture (High-Level)
-
-- **Interface:** WhatsApp Business API / Twilio Webhook Integration
-- **Conversational Processing:** Intent classification & natural language entity extraction for medical dosages and schedules
-- **Background Scheduler:** Cron / task queue for timely dispatch of reminders and stock alerts
-- **Persistence Layer:** Relational data model supporting multi-dependent schemas and historical intake logs
+### Backend API (Go)
+- **Language:** Go 1.21+
+- **Framework:** Gin (HTTP router)
+- **Database:** PostgreSQL 15+
+- **Authentication:** JWT tokens
+- **Security:** bcrypt password hashing
+- **Deployment:** Docker + Docker Compose
 
 ---
 
@@ -100,4 +134,74 @@ flowchart LR
 ```text
 gobi/
 ├── README.md
+├── SETUP_GUIDE.md              # Complete setup instructions
+├── backend-api/                # Go REST API
+│   ├── cmd/server/            # Application entry point
+│   ├── internal/
+│   │   ├── api/               # HTTP handlers
+│   │   ├── auth/              # JWT & password hashing
+│   │   ├── config/            # Configuration
+│   │   ├── database/          # DB connection & migrations
+│   │   ├── middleware/        # Auth, CORS middleware
+│   │   └── models/            # Data models
+│   ├── Dockerfile
+│   ├── docker-compose.yml     # PostgreSQL + API
+│   └── README.md
+├── gobi-mobile/               # Flutter mobile app
+│   ├── lib/
+│   │   ├── main.dart         # App entry point
+│   │   ├── core/             # Config, theme, providers
+│   │   ├── data/             # API client, models, repos
+│   │   └── features/         # UI screens by feature
+│   │       ├── auth/         # Login, Register
+│   │       ├── home/         # Dashboard
+│   │       ├── medications/  # Medications (placeholder)
+│   │       ├── documents/    # Documents (placeholder)
+│   │       ├── family/       # Family (placeholder)
+│   │       └── settings/     # Settings, Profile
+│   ├── pubspec.yaml
+│   └── README.md
+└── communication-gateway/     # WhatsApp gateway (archived)
 ```
+
+---
+
+## 🚀 Quick Start
+
+### Prerequisites
+- **Docker & Docker Compose** (for backend)
+- **Flutter SDK 3.0+** (for mobile app)
+- iOS Simulator OR Android Emulator
+
+### 1. Start Backend
+```bash
+cd backend-api
+docker-compose up -d
+```
+
+### 2. Configure Mobile App
+Edit `gobi-mobile/lib/core/config/app_config.dart`:
+```dart
+static const String baseUrl = 'http://localhost:8000';  // iOS
+// or 'http://10.0.2.2:8000' for Android emulator
+```
+
+### 3. Run Mobile App
+```bash
+cd gobi-mobile
+flutter pub get
+flutter run
+```
+
+**See [SETUP_GUIDE.md](SETUP_GUIDE.md) for detailed instructions.**
+
+---
+
+## 📊 Success Metrics (Future)
+
+Once medication features are implemented:
+- **Reminder Interaction Rate:** % of medication reminders acknowledged within 60 minutes
+- **Adherence Tracking:** Consistency of medication intake over 14-day and 30-day windows
+- **Inventory Accuracy:** Correlation between app-tracked inventory and actual refill cycles
+- **User Retention:** Daily/weekly active users
+- **Family Profiles:** Average number of dependents managed per user
