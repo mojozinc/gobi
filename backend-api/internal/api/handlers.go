@@ -108,7 +108,7 @@ func (s *Server) register(c *gin.Context) {
 	err = s.db.QueryRow(
 		`INSERT INTO users (email, password_hash, name, phone, created_at, updated_at)
 		 VALUES ($1, $2, $3, $4, $5, $6)
-		 RETURNING id, email, name, phone, photo_url, created_at, updated_at`,
+		 RETURNING id, email, name, COALESCE(phone, ''), COALESCE(photo_url, ''), created_at, updated_at`,
 		req.Email, hashedPassword, req.Name, req.Phone, time.Now(), time.Now(),
 	).Scan(&user.ID, &user.Email, &user.Name, &user.Phone, &user.PhotoURL, &user.CreatedAt, &user.UpdatedAt)
 
@@ -142,7 +142,7 @@ func (s *Server) login(c *gin.Context) {
 	var user models.User
 	var passwordHash string
 	err := s.db.QueryRow(
-		`SELECT id, email, password_hash, name, phone, photo_url, created_at, updated_at
+		`SELECT id, email, password_hash, name, COALESCE(phone, ''), COALESCE(photo_url, ''), created_at, updated_at
 		 FROM users WHERE email = $1`,
 		req.Email,
 	).Scan(&user.ID, &user.Email, &passwordHash, &user.Name, &user.Phone, &user.PhotoURL, &user.CreatedAt, &user.UpdatedAt)
@@ -185,7 +185,7 @@ func (s *Server) getProfile(c *gin.Context) {
 
 	var user models.User
 	err := s.db.QueryRow(
-		`SELECT id, email, name, phone, photo_url, created_at, updated_at
+		`SELECT id, email, name, COALESCE(phone, ''), COALESCE(photo_url, ''), created_at, updated_at
 		 FROM users WHERE id = $1`,
 		userID,
 	).Scan(&user.ID, &user.Email, &user.Name, &user.Phone, &user.PhotoURL, &user.CreatedAt, &user.UpdatedAt)
@@ -225,7 +225,7 @@ func (s *Server) updateProfile(c *gin.Context) {
 		     photo_url = COALESCE(NULLIF($3, ''), photo_url),
 		     updated_at = $4
 		 WHERE id = $5
-		 RETURNING id, email, name, phone, photo_url, created_at, updated_at`,
+		 RETURNING id, email, name, COALESCE(phone, ''), COALESCE(photo_url, ''), created_at, updated_at`,
 		req.Name, req.Phone, req.PhotoURL, time.Now(), userID,
 	).Scan(&user.ID, &user.Email, &user.Name, &user.Phone, &user.PhotoURL, &user.CreatedAt, &user.UpdatedAt)
 

@@ -1,7 +1,7 @@
 class AppConfig {
   // API Configuration
-  // Note: For physical device on same Wi-Fi, use your machine's LAN IP (192.168.0.109)
-  static const String baseUrl = 'http://192.168.0.109:8000';
+  // Using 127.0.0.1:8000 via adb reverse tcp:8000 tcp:8000 for reliable, zero-latency connection
+  static const String baseUrl = 'http://127.0.0.1:8000';
   static const String apiVersion = '/api/v1';
   static const String apiBaseUrl = '$baseUrl$apiVersion';
 
