@@ -46,3 +46,20 @@ kotlin {
 flutter {
     source = "../.."
 }
+
+tasks.register("setupAdbReverse") {
+    description = "Automatically sets up adb reverse tunnel for local backend communication"
+    doLast {
+        try {
+            val adbPath = androidComponents.sdkComponents.adb.get().asFile.absolutePath
+            exec {
+                commandLine(adbPath, "reverse", "tcp:8000", "tcp:8000")
+                isIgnoreExitValue = true
+            }
+        } catch (_: Exception) {}
+    }
+}
+
+afterEvaluate {
+    tasks.findByName("preBuild")?.dependsOn("setupAdbReverse")
+}
