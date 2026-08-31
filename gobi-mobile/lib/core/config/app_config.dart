@@ -1,6 +1,7 @@
 class AppConfig {
   // API Configuration
-  static const String baseUrl = 'http://localhost:8000';
+  // Note: For physical device on same Wi-Fi, use your machine's LAN IP (192.168.0.109)
+  static const String baseUrl = 'http://192.168.0.109:8000';
   static const String apiVersion = '/api/v1';
   static const String apiBaseUrl = '$baseUrl$apiVersion';
 

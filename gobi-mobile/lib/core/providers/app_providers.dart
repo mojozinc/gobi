@@ -5,8 +5,8 @@ import '../../data/repositories/auth_repository.dart';
 import '../../data/models/user.dart';
 
 // Shared Preferences Provider
-final sharedPreferencesProvider = Provider<SharedPreferences>((ref) {
-  throw UnimplementedError('SharedPreferences not initialized');
+final sharedPreferencesProvider = Provider<SharedPreferences?>((ref) {
+  return null;
 });
 
 // API Client Provider
