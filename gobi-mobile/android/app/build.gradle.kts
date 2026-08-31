@@ -51,9 +51,12 @@ tasks.register("setupAdbReverse") {
     description = "Automatically sets up adb reverse tunnel for local backend communication"
     doLast {
         try {
+            val port = System.getenv("API_BASE_URL_PORT")
+                ?: (project.findProperty("API_BASE_URL_PORT") as? String)
+                ?: "8000"
             val adbPath = androidComponents.sdkComponents.adb.get().asFile.absolutePath
             exec {
-                commandLine(adbPath, "reverse", "tcp:8000", "tcp:8000")
+                commandLine(adbPath, "reverse", "tcp:$port", "tcp:$port")
                 isIgnoreExitValue = true
             }
         } catch (_: Exception) {}

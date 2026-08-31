@@ -81,27 +81,53 @@ cd gobi-mobile
 flutter pub get
 ```
 
-### 3. Configure Backend URL
+### 3. Backend URL Configuration & Environment Variables
 
-Edit `lib/core/config/app_config.dart`:
-```dart
-static const String baseUrl = 'http://YOUR_BACKEND_IP:8000';
-```
+The backend API URL can be passed at build/run time via `--dart-define`, without editing source code:
 
-**Important**:
-- For iOS Simulator: Use `http://localhost:8000`
-- For Android Emulator: Use `http://10.0.2.2:8000`
-- For Physical Device: Use your computer's IP (e.g., `http://192.168.1.100:8000`)
+- **Default (Local via ADB reverse / Emulator)**: `http://127.0.0.1:8000`
+- **Custom URL / Wi-Fi LAN IP**:
+  ```bash
+  flutter run --dart-define=API_BASE_URL=http://192.168.0.109:8000
+  ```
+
+#### Automatic ADB Reverse Tunneling (`API_BASE_URL_PORT`)
+For Android devices (USB or wireless ADB), Gradle automatically runs `adb reverse` before building.
+To customize the port forwarded by Gradle, set the environment variable:
+- **Linux/macOS:**
+  ```bash
+  export API_BASE_URL_PORT=8000
+  ```
+- **Windows (PowerShell):**
+  ```powershell
+  $env:API_BASE_URL_PORT="8000"
+  ```
+- **Windows (CMD):**
+  ```cmd
+  set API_BASE_URL_PORT=8000
+  ```
 
 ### 4. Run the App
 
+#### Linux / macOS
 ```bash
-# Run on connected device/emulator
+# Run on connected device/emulator (defaults to http://127.0.0.1:8000)
 flutter run
 
-# Or specify a device
-flutter devices
-flutter run -d <device-id>
+# Run with custom backend URL
+flutter run --dart-define=API_BASE_URL=http://192.168.0.109:8000
+```
+
+#### Windows
+```powershell
+# 1. (Optional) If connecting wirelessly, pair and connect ADB:
+adb connect <PHONE_IP>:<PORT>
+
+# 2. Run the mobile app with local backend tunnel (PowerShell):
+flutter run
+
+# Or with a custom backend IP:
+flutter run --dart-define=API_BASE_URL=http://192.168.0.109:8000
 ```
 
 ## Project Structure
