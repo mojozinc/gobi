@@ -12,13 +12,21 @@ import 'features/home/screens/home_screen.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize SharedPreferences
-  final sharedPreferences = await SharedPreferences.getInstance();
+  // Initialize SharedPreferences with timeout so initialization issues never block runApp
+  SharedPreferences? sharedPreferences;
+  try {
+    sharedPreferences = await SharedPreferences.getInstance().timeout(
+      const Duration(seconds: 2),
+    );
+  } catch (e, stack) {
+    debugPrint('Notice: Initializing SharedPreferences failed or timed out: $e\n$stack');
+  }
 
   runApp(
     ProviderScope(
       overrides: [
-        sharedPreferencesProvider.overrideWithValue(sharedPreferences),
+        if (sharedPreferences != null)
+          sharedPreferencesProvider.overrideWithValue(sharedPreferences),
       ],
       child: const GobiApp(),
     ),

@@ -6,7 +6,8 @@ import 'dart:convert';
 
 class AuthRepository {
   final ApiClient _apiClient;
-  final SharedPreferences _prefs;
+  final SharedPreferences? _prefs;
+  final Map<String, String> _inMemoryStorage = {};
 
   AuthRepository(this._apiClient, this._prefs);
 
@@ -45,8 +46,12 @@ class AuthRepository {
   }
 
   Future<void> logout() async {
-    await _prefs.remove(AppConfig.tokenKey);
-    await _prefs.remove(AppConfig.userKey);
+    try {
+      await _prefs?.remove(AppConfig.tokenKey);
+      await _prefs?.remove(AppConfig.userKey);
+    } catch (_) {}
+    _inMemoryStorage.remove(AppConfig.tokenKey);
+    _inMemoryStorage.remove(AppConfig.userKey);
     _apiClient.setAuthToken(null);
   }
 
@@ -60,26 +65,45 @@ class AuthRepository {
   }
 
   Future<String?> getToken() async {
-    return _prefs.getString(AppConfig.tokenKey);
+    try {
+      return _prefs?.getString(AppConfig.tokenKey) ?? _inMemoryStorage[AppConfig.tokenKey];
+    } catch (_) {
+      return _inMemoryStorage[AppConfig.tokenKey];
+    }
   }
 
   Future<User?> getCurrentUser() async {
-    final userJson = _prefs.getString(AppConfig.userKey);
-    if (userJson != null) {
-      return User.fromJson(json.decode(userJson));
+    try {
+      final userJson = _prefs?.getString(AppConfig.userKey) ?? _inMemoryStorage[AppConfig.userKey];
+      if (userJson != null) {
+        return User.fromJson(json.decode(userJson));
+      }
+    } catch (_) {
+      final userJson = _inMemoryStorage[AppConfig.userKey];
+      if (userJson != null) {
+        return User.fromJson(json.decode(userJson));
+      }
     }
     return null;
   }
 
   Future<void> _saveAuthData(String token, User user) async {
-    await _prefs.setString(AppConfig.tokenKey, token);
-    await _prefs.setString(AppConfig.userKey, json.encode(user.toJson()));
+    _inMemoryStorage[AppConfig.tokenKey] = token;
+    _inMemoryStorage[AppConfig.userKey] = json.encode(user.toJson());
+    try {
+      await _prefs?.setString(AppConfig.tokenKey, token);
+      await _prefs?.setString(AppConfig.userKey, json.encode(user.toJson()));
+    } catch (_) {}
     _apiClient.setAuthToken(token);
   }
 
   Future<User> refreshProfile() async {
     final user = await _apiClient.getProfile();
-    await _prefs.setString(AppConfig.userKey, json.encode(user.toJson()));
+    final userJson = json.encode(user.toJson());
+    _inMemoryStorage[AppConfig.userKey] = userJson;
+    try {
+      await _prefs?.setString(AppConfig.userKey, userJson);
+    } catch (_) {}
     return user;
   }
 
@@ -93,7 +117,11 @@ class AuthRepository {
       phone: phone,
       photoUrl: photoUrl,
     );
-    await _prefs.setString(AppConfig.userKey, json.encode(user.toJson()));
+    final userJson = json.encode(user.toJson());
+    _inMemoryStorage[AppConfig.userKey] = userJson;
+    try {
+      await _prefs?.setString(AppConfig.userKey, userJson);
+    } catch (_) {}
     return user;
   }
 }

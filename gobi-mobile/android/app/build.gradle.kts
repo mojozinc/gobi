@@ -15,8 +15,7 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.example.gobi_mobile"
+        applicationId = "com.gobi.mobile"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
@@ -46,4 +45,24 @@ kotlin {
 
 flutter {
     source = "../.."
+}
+
+tasks.register("setupAdbReverse") {
+    description = "Automatically sets up adb reverse tunnel for local backend communication"
+    doLast {
+        try {
+            val port = System.getenv("API_BASE_URL_PORT")
+                ?: (project.findProperty("API_BASE_URL_PORT") as? String)
+                ?: "8000"
+            val adbPath = androidComponents.sdkComponents.adb.get().asFile.absolutePath
+            exec {
+                commandLine(adbPath, "reverse", "tcp:$port", "tcp:$port")
+                isIgnoreExitValue = true
+            }
+        } catch (_: Exception) {}
+    }
+}
+
+afterEvaluate {
+    tasks.findByName("preBuild")?.dependsOn("setupAdbReverse")
 }

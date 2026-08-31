@@ -179,18 +179,32 @@ cd backend-api
 docker-compose up -d
 ```
 
-### 2. Configure Mobile App
-Edit `gobi-mobile/lib/core/config/app_config.dart`:
-```dart
-static const String baseUrl = 'http://localhost:8000';  // iOS
-// or 'http://10.0.2.2:8000' for Android emulator
+### 2. Configure Backend URL & Environment Variables
+The mobile app defaults to `http://127.0.0.1:8000` with automatic Gradle `adb reverse` tunneling for Android devices. To specify a custom host or Wi-Fi LAN IP at build/run time without changing code:
+```bash
+flutter run --dart-define=API_BASE_URL=http://192.168.0.109:8000
 ```
+*(To customize the automatic ADB reverse port, set `API_BASE_URL_PORT=<port>` in your shell/environment).*
 
 ### 3. Run Mobile App
+
+#### Linux / macOS
 ```bash
 cd gobi-mobile
 flutter pub get
 flutter run
+```
+
+#### Windows (PowerShell / Command Prompt)
+```powershell
+cd gobi-mobile
+flutter pub get
+
+# Run on connected device (or emulator)
+flutter run
+
+# Or with custom backend IP:
+flutter run --dart-define=API_BASE_URL=http://192.168.0.109:8000
 ```
 
 **See [SETUP_GUIDE.md](SETUP_GUIDE.md) for detailed instructions.**

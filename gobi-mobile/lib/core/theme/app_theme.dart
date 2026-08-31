@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../constants/app_colors.dart';
 
 class AppTheme {
@@ -13,36 +12,36 @@ class AppTheme {
       error: AppColors.error,
     ),
     scaffoldBackgroundColor: AppColors.backgroundLight,
-    textTheme: GoogleFonts.interTextTheme().copyWith(
-      headlineLarge: const TextStyle(
+    textTheme: const TextTheme(
+      headlineLarge: TextStyle(
         color: AppColors.textPrimaryLight,
         fontSize: 32,
         fontWeight: FontWeight.bold,
       ),
-      headlineMedium: const TextStyle(
+      headlineMedium: TextStyle(
         color: AppColors.textPrimaryLight,
         fontSize: 24,
         fontWeight: FontWeight.w600,
       ),
-      bodyLarge: const TextStyle(
+      bodyLarge: TextStyle(
         color: AppColors.textPrimaryLight,
         fontSize: 16,
       ),
-      bodyMedium: const TextStyle(
+      bodyMedium: TextStyle(
         color: AppColors.textSecondaryLight,
         fontSize: 14,
       ),
     ),
-    appBarTheme: AppBarTheme(
+    appBarTheme: const AppBarTheme(
       backgroundColor: AppColors.surfaceLight,
       elevation: 0,
       centerTitle: false,
-      titleTextStyle: GoogleFonts.inter(
+      titleTextStyle: TextStyle(
         color: AppColors.textPrimaryLight,
         fontSize: 20,
         fontWeight: FontWeight.w600,
       ),
-      iconTheme: const IconThemeData(color: AppColors.textPrimaryLight),
+      iconTheme: IconThemeData(color: AppColors.textPrimaryLight),
     ),
     cardTheme: CardThemeData(
       color: AppColors.surfaceLight,
@@ -98,36 +97,36 @@ class AppTheme {
       error: AppColors.error,
     ),
     scaffoldBackgroundColor: AppColors.backgroundDark,
-    textTheme: GoogleFonts.interTextTheme(ThemeData.dark().textTheme).copyWith(
-      headlineLarge: const TextStyle(
+    textTheme: const TextTheme(
+      headlineLarge: TextStyle(
         color: AppColors.textPrimaryDark,
         fontSize: 32,
         fontWeight: FontWeight.bold,
       ),
-      headlineMedium: const TextStyle(
+      headlineMedium: TextStyle(
         color: AppColors.textPrimaryDark,
         fontSize: 24,
         fontWeight: FontWeight.w600,
       ),
-      bodyLarge: const TextStyle(
+      bodyLarge: TextStyle(
         color: AppColors.textPrimaryDark,
         fontSize: 16,
       ),
-      bodyMedium: const TextStyle(
+      bodyMedium: TextStyle(
         color: AppColors.textSecondaryDark,
         fontSize: 14,
       ),
     ),
-    appBarTheme: AppBarTheme(
+    appBarTheme: const AppBarTheme(
       backgroundColor: AppColors.surfaceDark,
       elevation: 0,
       centerTitle: false,
-      titleTextStyle: GoogleFonts.inter(
+      titleTextStyle: TextStyle(
         color: AppColors.textPrimaryDark,
         fontSize: 20,
         fontWeight: FontWeight.w600,
       ),
-      iconTheme: const IconThemeData(color: AppColors.textPrimaryDark),
+      iconTheme: IconThemeData(color: AppColors.textPrimaryDark),
     ),
     cardTheme: CardThemeData(
       color: AppColors.surfaceDark,
