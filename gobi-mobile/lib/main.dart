@@ -9,6 +9,8 @@ import 'features/auth/screens/login_screen.dart';
 import 'features/auth/screens/register_screen.dart';
 import 'features/home/screens/home_screen.dart';
 
+final GlobalKey<ScaffoldMessengerState> rootScaffoldMessengerKey = GlobalKey<ScaffoldMessengerState>();
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -33,15 +35,62 @@ void main() async {
   );
 }
 
-class GobiApp extends ConsumerWidget {
+class GobiApp extends ConsumerStatefulWidget {
   const GobiApp({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<GobiApp> createState() => _GobiAppState();
+}
+
+class _GobiAppState extends ConsumerState<GobiApp> {
+  @override
+  void initState() {
+    super.initState();
+    // Initialize intent router on cold start / background resumes
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final router = ref.read(intentRouterServiceProvider);
+      router.init();
+      router.events.listen((event) {
+        rootScaffoldMessengerKey.currentState?.showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.mic, color: Colors.white),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Gemini Voice Action: ${event.action}',
+                        style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+                      ),
+                      Text(
+                        event.statusMessage,
+                        style: const TextStyle(fontSize: 12, color: Colors.white70),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: const Color(0xFF2E7D32),
+            duration: const Duration(seconds: 5),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      });
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final isDarkMode = ref.watch(themeModeProvider);
 
     return MaterialApp(
       title: 'Gobi',
+      scaffoldMessengerKey: rootScaffoldMessengerKey,
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,

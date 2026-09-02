@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Gobi</string>
+    <string name="shortcut_set_schedule">Set Schedule</string>
+    <string name="shortcut_set_schedule_long">Set Medication Schedule</string>
+    <string name="shortcut_get_schedule">View Schedule</string>
+    <string name="shortcut_get_schedule_long">View Medication Schedule</string>
+</resources>

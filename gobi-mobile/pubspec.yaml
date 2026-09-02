@@ -29,6 +29,9 @@ dependencies:
   path_provider: ^2.1.2
   path: ^1.9.0
 
+  # Deep Linking & System Intents
+  app_links: ^6.3.2
+
   # Utils
   intl: ^0.18.1
   logger: ^2.0.2+1

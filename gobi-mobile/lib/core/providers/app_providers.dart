@@ -1,8 +1,50 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../data/api/api_client.dart';
-import '../../data/repositories/auth_repository.dart';
 import '../../data/models/user.dart';
+import '../../data/repositories/auth_repository.dart';
+import '../../data/local/app_database.dart';
+import '../../data/repositories/medication_repository.dart';
+import '../services/intent_router_service.dart';
+
+// Local Drift Database Provider
+final appDatabaseProvider = Provider<AppDatabase>((ref) {
+  final db = AppDatabase();
+  ref.onDispose(() => db.close());
+  return db;
+});
+
+// Medication Repository Provider
+final medicationRepositoryProvider = Provider<MedicationRepository>((ref) {
+  final db = ref.watch(appDatabaseProvider);
+  return MedicationRepository(db);
+});
+
+// Intent Router Service Provider
+final intentRouterServiceProvider = Provider<IntentRouterService>((ref) {
+  final repo = ref.watch(medicationRepositoryProvider);
+  final service = IntentRouterService(repo);
+  ref.onDispose(() => service.dispose());
+  return service;
+});
+
+// Stream of Voice Action Intent Events
+final intentEventStreamProvider = StreamProvider<IntentEvent>((ref) {
+  final service = ref.watch(intentRouterServiceProvider);
+  return service.events;
+});
+
+// Reactive Active Medications Stream
+final activeMedicationsProvider = StreamProvider<List<MedicationEntry>>((ref) {
+  final repo = ref.watch(medicationRepositoryProvider);
+  return repo.watchMedications();
+});
+
+// Reactive Today's Doses Stream
+final todayDosesProvider = StreamProvider<List<DoseLogEntry>>((ref) {
+  final repo = ref.watch(medicationRepositoryProvider);
+  return repo.watchTodayDoses();
+});
 
 // Shared Preferences Provider
 final sharedPreferencesProvider = Provider<SharedPreferences?>((ref) {

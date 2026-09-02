@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- 1. SET / CREATE SCHEDULE (e.g. "Hey Gemini, I need to take vitamin d, once every week for next 6 weeks") -->
+    <capability android:name="actions.intent.CREATE_SCHEDULE">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.gobi.mobile"
+            android:targetClass="com.example.gobi_mobile.MainActivity"
+            android:data="gobi://intent/medication/set-schedule?name={name}&amp;frequency={frequency}&amp;durationWeeks={durationWeeks}&amp;dosage={dosage}">
+            <parameter
+                android:name="schedule.name"
+                android:key="name" />
+            <parameter
+                android:name="schedule.recurrenceFrequency"
+                android:key="frequency" />
+            <parameter
+                android:name="schedule.duration"
+                android:key="durationWeeks" />
+            <parameter
+                android:name="schedule.dosage"
+                android:key="dosage" />
+        </intent>
+    </capability>
+
+    <!-- Custom fallback capability for SET_SCHEDULE -->
+    <capability android:name="custom.actions.intent.SET_SCHEDULE">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.gobi.mobile"
+            android:targetClass="com.example.gobi_mobile.MainActivity"
+            android:data="gobi://intent/medication/set-schedule?name={name}&amp;frequency={frequency}&amp;durationWeeks={durationWeeks}&amp;dosage={dosage}">
+            <parameter
+                android:name="name"
+                android:key="name" />
+            <parameter
+                android:name="frequency"
+                android:key="frequency" />
+            <parameter
+                android:name="durationWeeks"
+                android:key="durationWeeks" />
+            <parameter
+                android:name="dosage"
+                android:key="dosage" />
+        </intent>
+    </capability>
+
+    <!-- EDIT SCHEDULE -->
+    <capability android:name="custom.actions.intent.EDIT_SCHEDULE">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.gobi.mobile"
+            android:targetClass="com.example.gobi_mobile.MainActivity"
+            android:data="gobi://intent/medication/edit-schedule?name={name}&amp;frequency={frequency}&amp;durationWeeks={durationWeeks}">
+            <parameter
+                android:name="name"
+                android:key="name" />
+            <parameter
+                android:name="frequency"
+                android:key="frequency" />
+            <parameter
+                android:name="durationWeeks"
+                android:key="durationWeeks" />
+        </intent>
+    </capability>
+
+    <!-- 2. GET SCHEDULE (e.g. "Did I take vit d this week?" or "What medications do I have left today in Gobi?") -->
+    <capability android:name="actions.intent.GET_MEDICATION_SCHEDULE">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.gobi.mobile"
+            android:targetClass="com.example.gobi_mobile.MainActivity"
+            android:data="gobi://intent/medication/get-schedule?name={name}&amp;date={date}">
+            <parameter
+                android:name="medication.name"
+                android:key="name" />
+            <parameter
+                android:name="schedule.date"
+                android:key="date" />
+        </intent>
+    </capability>
+
+    <!-- 3. RECORD DOSE / MEDICATION (e.g. "I just took vit d in the morning") -->
+    <capability android:name="actions.intent.RECORD_MEDICATION">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.gobi.mobile"
+            android:targetClass="com.example.gobi_mobile.MainActivity"
+            android:data="gobi://intent/medication/record-dose?name={name}&amp;status={status}&amp;time={time}">
+            <parameter
+                android:name="medication.name"
+                android:key="name" />
+            <parameter
+                android:name="medication.status"
+                android:key="status" />
+            <parameter
+                android:name="medication.time"
+                android:key="time" />
+        </intent>
+    </capability>
+
+    <!-- Static Shortcuts for Quick Access -->
+    <shortcut
+        android:shortcutId="shortcut_set_schedule"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/shortcut_set_schedule"
+        android:shortcutLongLabel="@string/shortcut_set_schedule_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.gobi.mobile"
+            android:targetClass="com.example.gobi_mobile.MainActivity"
+            android:data="gobi://intent/medication/set-schedule" />
+    </shortcut>
+
+    <shortcut
+        android:shortcutId="shortcut_get_schedule"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/shortcut_get_schedule"
+        android:shortcutLongLabel="@string/shortcut_get_schedule_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.gobi.mobile"
+            android:targetClass="com.example.gobi_mobile.MainActivity"
+            android:data="gobi://intent/medication/get-schedule" />
+    </shortcut>
+
+</shortcuts>

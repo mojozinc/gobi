@@ -55,10 +55,7 @@ tasks.register("setupAdbReverse") {
                 ?: (project.findProperty("API_BASE_URL_PORT") as? String)
                 ?: "8000"
             val adbPath = androidComponents.sdkComponents.adb.get().asFile.absolutePath
-            exec {
-                commandLine(adbPath, "reverse", "tcp:$port", "tcp:$port")
-                isIgnoreExitValue = true
-            }
+            ProcessBuilder(adbPath, "reverse", "tcp:$port", "tcp:$port").start()
         } catch (_: Exception) {}
     }
 }
