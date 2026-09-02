@@ -102,6 +102,16 @@ class _GobiAppState extends ConsumerState<GobiApp> {
         '/register': (context) => const RegisterScreen(),
         '/home': (context) => const HomeScreen(),
       },
+      onGenerateRoute: (settings) {
+        final uri = Uri.tryParse(settings.name ?? '');
+        if (uri != null && (uri.path.contains('medication') || uri.path.contains('intent'))) {
+          return MaterialPageRoute(builder: (context) => const HomeScreen());
+        }
+        return null;
+      },
+      onUnknownRoute: (settings) => MaterialPageRoute(
+        builder: (context) => const HomeScreen(),
+      ),
     );
   }
 }
