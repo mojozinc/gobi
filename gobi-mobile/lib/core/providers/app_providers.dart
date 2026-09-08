@@ -31,7 +31,8 @@ final authRepositoryProvider = Provider<AuthRepository>((ref) {
 // Auth State Provider
 final authStateProvider = StateNotifierProvider<AuthStateNotifier, AuthState>((ref) {
   final authRepository = ref.watch(authRepositoryProvider);
-  return AuthStateNotifier(authRepository);
+  final apiService = ref.watch(apiServiceProvider);
+  return AuthStateNotifier(authRepository, apiService);
 });
 
 // Theme Mode Provider
@@ -71,8 +72,9 @@ class AuthState {
 // Auth State Notifier
 class AuthStateNotifier extends StateNotifier<AuthState> {
   final AuthRepository _authRepository;
+  final ApiService _apiService;
 
-  AuthStateNotifier(this._authRepository)
+  AuthStateNotifier(this._authRepository, this._apiService)
       : super(AuthState(isAuthenticated: false)) {
     _checkAuthStatus();
   }
@@ -81,7 +83,48 @@ class AuthStateNotifier extends StateNotifier<AuthState> {
     final isAuth = await _authRepository.isAuthenticated();
     if (isAuth) {
       final user = await _authRepository.getCurrentUser();
+      final token = await _authRepository.getToken();
+      if (token != null) {
+        _apiService.setToken(token);
+      }
+      if (user != null) {
+        _apiService.setUser(user.toJson());
+      }
       state = state.copyWith(isAuthenticated: true, user: user);
+    } else if (_apiService.isAuthenticated) {
+      final userMap = _apiService.currentUser;
+      User? user;
+      if (userMap != null) {
+        try {
+          user = User.fromJson(userMap);
+        } catch (_) {}
+      }
+      state = state.copyWith(isAuthenticated: true, user: user);
+    }
+  }
+
+  Future<void> loginAnonymously({String? deviceId, String? name}) async {
+    state = state.copyWith(isLoading: true, error: null);
+    try {
+      final res = await _apiService.loginAnonymously(deviceId: deviceId, name: name);
+      final userMap = res['user'] as Map<String, dynamic>?;
+      User? user;
+      if (userMap != null) {
+        try {
+          user = User.fromJson(userMap);
+        } catch (_) {}
+      }
+      state = AuthState(
+        isAuthenticated: true,
+        user: user,
+        isLoading: false,
+      );
+    } catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        error: e.toString(),
+      );
+      rethrow;
     }
   }
 
@@ -99,6 +142,8 @@ class AuthStateNotifier extends StateNotifier<AuthState> {
         name: name,
         phone: phone,
       );
+      _apiService.setToken(response.token);
+      _apiService.setUser(response.user.toJson());
       state = AuthState(
         isAuthenticated: true,
         user: response.user,
@@ -123,6 +168,8 @@ class AuthStateNotifier extends StateNotifier<AuthState> {
         email: email,
         password: password,
       );
+      _apiService.setToken(response.token);
+      _apiService.setUser(response.user.toJson());
       state = AuthState(
         isAuthenticated: true,
         user: response.user,
@@ -139,6 +186,7 @@ class AuthStateNotifier extends StateNotifier<AuthState> {
 
   Future<void> logout() async {
     await _authRepository.logout();
+    _apiService.clearAuth();
     state = AuthState(isAuthenticated: false);
   }
 
@@ -153,6 +201,7 @@ class AuthStateNotifier extends StateNotifier<AuthState> {
         phone: phone,
         photoUrl: photoUrl,
       );
+      _apiService.setUser(updatedUser.toJson());
       state = state.copyWith(user: updatedUser);
     } catch (e) {
       rethrow;

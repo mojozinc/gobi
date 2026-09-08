@@ -280,11 +280,11 @@ class OpenRouterService:
                 )
                 if res.status_code == 200:
                     data = res.json()
-                    content = data["choices"][0]["message"]["content"]
-                    # Clean markdown codeblocks
-                    clean_json = re.sub(r'```(?:json)?\s*([\s\S]*?)\s*```', r'\1', content).strip()
-                    parsed = json.loads(clean_json)
-                    return ScanPrescriptionResponse(**parsed)
+                    choices = data.get("choices", [])
+                    if choices:
+                        content = choices[0].get("message", {}).get("content", "")
+                        parsed = self._extract_json_payload(content)
+                        return ScanPrescriptionResponse(**parsed)
         except Exception as e:
             logger.error(f"Prescription OCR call failed: {e}")
 
@@ -296,6 +296,30 @@ class OpenRouterService:
                 PrescriptionMedicationItem(name="Extracted Medication", dosage="1 dose", frequency="daily", duration_weeks=2, instructions="As prescribed")
             ]
         )
+
+    def _extract_json_payload(self, content: str) -> dict:
+        """Extracts JSON object from raw LLM output even if wrapped in markdown code blocks or surrounding text."""
+        trimmed = content.strip()
+        try:
+            return json.loads(trimmed)
+        except Exception:
+            pass
+
+        codeblock_match = re.search(r'```(?:json)?\s*([\s\S]*?)\s*```', content)
+        if codeblock_match:
+            try:
+                return json.loads(codeblock_match.group(1).strip())
+            except Exception:
+                pass
+
+        brace_match = re.search(r'\{[\s\S]*\}', content)
+        if brace_match:
+            try:
+                return json.loads(brace_match.group(0))
+            except Exception:
+                pass
+
+        raise ValueError(f"Could not parse valid JSON from LLM response: {content[:100]}")
 
     async def chat_rag(self, query: str, context: str, history: List[Dict[str, str]]) -> str:
         """Answers user queries grounded in real user medications, dose logs, and prescription texts."""

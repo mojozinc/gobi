@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, s
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.db.session import get_db
-from app.db.models import User, Document, Medication, DoseLog
+from app.db.models import User, Document, Medication, DoseLog, Dependent
 from app.schemas.ai import (
     VoiceIntentRequest, VoiceIntentResponse,
     ScanPrescriptionResponse, ChatRequest, ChatResponse
@@ -15,12 +15,28 @@ from app.api.deps import get_current_user
 
 router = APIRouter(prefix="/ai", tags=["AI"])
 
+MAX_IMAGE_SIZE_BYTES = 10 * 1024 * 1024  # 10 MB
+
+async def _verify_dependent(db: AsyncSession, dependent_id: Optional[int], user_id: int):
+    if dependent_id is not None:
+        dep_res = await db.execute(
+            select(Dependent).where(Dependent.id == dependent_id, Dependent.user_id == user_id)
+        )
+        if not dep_res.scalar_one_or_none():
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Dependent not found or access denied"
+            )
+
 @router.post("/parse-intent", response_model=VoiceIntentResponse)
 async def parse_voice_intent(
     req: VoiceIntentRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
+    if req.dependent_id is not None:
+        await _verify_dependent(db, req.dependent_id, current_user.id)
+
     # Retrieve light context (e.g. list of user's active medication names for fuzzy matching)
     res = await db.execute(
         select(Medication.name).where(Medication.user_id == current_user.id, Medication.is_active == True)
@@ -38,10 +54,18 @@ async def scan_prescription(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    # Read image contents
+    if dependent_id is not None:
+        await _verify_dependent(db, dependent_id, current_user.id)
+
+    # Read image contents with size constraint
     file_bytes = await file.read()
     if not file_bytes:
         raise HTTPException(status_code=400, detail="Empty image file uploaded")
+    if len(file_bytes) > MAX_IMAGE_SIZE_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail="File size exceeds maximum limit of 10MB"
+        )
 
     mime_type = file.content_type or "image/jpeg"
     image_b64 = base64.b64encode(file_bytes).decode("utf-8")
@@ -73,6 +97,9 @@ async def health_chat(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
+    if req.dependent_id is not None:
+        await _verify_dependent(db, req.dependent_id, current_user.id)
+
     # 1. Build RAG health context from SQLite/Postgres DB
     context = await build_user_health_context(
         db=db,

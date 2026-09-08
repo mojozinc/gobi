@@ -4,13 +4,17 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ApiService {
-  // Use localhost (or adb reverse port 8000) for development
   final String baseUrl;
   final SharedPreferences? prefs;
+  final http.Client _client;
   String? _token;
   Map<String, dynamic>? _user;
 
-  ApiService({this.baseUrl = 'http://127.0.0.1:8000/api/v1', this.prefs}) {
+  ApiService({
+    this.baseUrl = 'http://127.0.0.1:8000/api/v1',
+    this.prefs,
+    http.Client? client,
+  }) : _client = client ?? http.Client() {
     _token = prefs?.getString('auth_token');
     final userStr = prefs?.getString('user_data');
     if (userStr != null) {
@@ -30,9 +34,25 @@ class ApiService {
     prefs?.setString('user_data', jsonEncode(user));
   }
 
-  String? get token => _token;
-  Map<String, dynamic>? get currentUser => _user;
-  bool get isAuthenticated => _token != null && _token!.isNotEmpty;
+  void clearAuth() {
+    _token = null;
+    _user = null;
+    prefs?.remove('auth_token');
+    prefs?.remove('user_data');
+  }
+
+  String? get token => _token ?? prefs?.getString('auth_token');
+  Map<String, dynamic>? get currentUser {
+    if (_user != null) return _user;
+    final userStr = prefs?.getString('user_data');
+    if (userStr != null) {
+      try {
+        _user = jsonDecode(userStr);
+      } catch (_) {}
+    }
+    return _user;
+  }
+  bool get isAuthenticated => token != null && token!.isNotEmpty;
 
   String getOrCreateDeviceId() {
     String? id = prefs?.getString('device_installation_id');
@@ -45,13 +65,13 @@ class ApiService {
 
   Map<String, String> get _headers => {
     'Content-Type': 'application/json',
-    if (_token != null) 'Authorization': 'Bearer $_token',
+    if (token != null) 'Authorization': 'Bearer $token',
   };
 
   // Auth
   Future<Map<String, dynamic>> loginAnonymously({String? deviceId, String? name}) async {
     final devId = deviceId ?? getOrCreateDeviceId();
-    final res = await http.post(
+    final res = await _client.post(
       Uri.parse('$baseUrl/auth/anonymous'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
@@ -71,7 +91,7 @@ class ApiService {
   }
 
   Future<Map<String, dynamic>> login(String email, String password) async {
-    final res = await http.post(
+    final res = await _client.post(
       Uri.parse('$baseUrl/auth/login'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({'email': email, 'password': password}),
@@ -88,7 +108,7 @@ class ApiService {
   }
 
   Future<Map<String, dynamic>> register(String name, String email, String password) async {
-    final res = await http.post(
+    final res = await _client.post(
       Uri.parse('$baseUrl/auth/register'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({'name': name, 'email': email, 'password': password}),
@@ -106,7 +126,7 @@ class ApiService {
 
   // AI Endpoints
   Future<Map<String, dynamic>> parseVoiceIntent(String text, {int? dependentId}) async {
-    final res = await http.post(
+    final res = await _client.post(
       Uri.parse('$baseUrl/ai/parse-intent'),
       headers: _headers,
       body: jsonEncode({
@@ -121,21 +141,21 @@ class ApiService {
     final uri = Uri.parse('$baseUrl/ai/scan-prescription');
     final request = http.MultipartRequest('POST', uri);
     
-    if (_token != null) {
-      request.headers['Authorization'] = 'Bearer $_token';
+    if (token != null) {
+      request.headers['Authorization'] = 'Bearer $token';
     }
     if (dependentId != null) {
       request.fields['dependent_id'] = dependentId.toString();
     }
     request.files.add(await http.MultipartFile.fromPath('file', filePath));
 
-    final streamedResponse = await request.send();
+    final streamedResponse = await _client.send(request);
     final response = await http.Response.fromStream(streamedResponse);
     return jsonDecode(utf8.decode(response.bodyBytes));
   }
 
   Future<Map<String, dynamic>> sendHealthChat(String query, {int? dependentId, List<Map<String, String>>? history}) async {
-    final res = await http.post(
+    final res = await _client.post(
       Uri.parse('$baseUrl/ai/chat'),
       headers: _headers,
       body: jsonEncode({
@@ -152,7 +172,7 @@ class ApiService {
     final url = dependentId != null 
         ? '$baseUrl/medications?dependent_id=$dependentId'
         : '$baseUrl/medications';
-    final res = await http.get(Uri.parse(url), headers: _headers);
+    final res = await _client.get(Uri.parse(url), headers: _headers);
     if (res.statusCode == 200) {
       return jsonDecode(utf8.decode(res.bodyBytes));
     }
@@ -160,7 +180,7 @@ class ApiService {
   }
 
   Future<Map<String, dynamic>> createMedication(Map<String, dynamic> data) async {
-    final res = await http.post(
+    final res = await _client.post(
       Uri.parse('$baseUrl/medications'),
       headers: _headers,
       body: jsonEncode(data),
@@ -172,7 +192,7 @@ class ApiService {
     final url = dependentId != null
         ? '$baseUrl/medications/doses/today?dependent_id=$dependentId'
         : '$baseUrl/medications/doses/today';
-    final res = await http.get(Uri.parse(url), headers: _headers);
+    final res = await _client.get(Uri.parse(url), headers: _headers);
     if (res.statusCode == 200) {
       return jsonDecode(utf8.decode(res.bodyBytes));
     }
@@ -180,7 +200,7 @@ class ApiService {
   }
 
   Future<Map<String, dynamic>> takeDose(int doseId) async {
-    final res = await http.post(
+    final res = await _client.post(
       Uri.parse('$baseUrl/medications/doses/$doseId/take'),
       headers: _headers,
     );
@@ -188,7 +208,7 @@ class ApiService {
   }
 
   Future<Map<String, dynamic>> undoDose(int doseId) async {
-    final res = await http.post(
+    final res = await _client.post(
       Uri.parse('$baseUrl/medications/doses/$doseId/undo'),
       headers: _headers,
     );

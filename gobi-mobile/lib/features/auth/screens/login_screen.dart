@@ -52,8 +52,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     });
 
     try {
-      final apiService = ref.read(apiServiceProvider);
-      await apiService.loginAnonymously();
+      await ref.read(authStateProvider.notifier).loginAnonymously();
 
       if (!mounted) return;
       Navigator.of(context).pushReplacementNamed('/home');

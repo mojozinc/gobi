@@ -91,15 +91,19 @@ class _VoiceLogModalState extends State<VoiceLogModal> {
 
       await _voiceService.startListening(
         onResult: (words) {
-          setState(() {
-            _textController.text = words;
-          });
+          if (mounted) {
+            setState(() {
+              _textController.text = words;
+            });
+          }
         },
         onError: (err) {
-          setState(() {
-            _isListening = false;
-            _statusMessage = 'Voice error: $err';
-          });
+          if (mounted) {
+            setState(() {
+              _isListening = false;
+              _statusMessage = 'Voice error: $err';
+            });
+          }
         },
       );
     }
@@ -116,9 +120,11 @@ class _VoiceLogModalState extends State<VoiceLogModal> {
 
     if (_isListening) {
       await _voiceService.stopListening();
-      setState(() {
-        _isListening = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isListening = false;
+        });
+      }
     }
 
     setState(() {
@@ -134,52 +140,75 @@ class _VoiceLogModalState extends State<VoiceLogModal> {
 
       if (!mounted) return;
 
-      final action = res['action'] as String?;
-      final params = res['parameters'] as Map<String, dynamic>? ?? {};
+      final action = (res['action'] as String?)?.toUpperCase();
 
-      if (action == 'set_schedule') {
+      if (action == 'SET_SCHEDULE') {
         // Human-in-the-loop safeguard: Open ReviewScheduleBottomSheet
-        final timesDynamic = params['times'] as List<dynamic>?;
-        final times = timesDynamic?.map((e) => e.toString()).toList();
+        final scheduleData = (res['set_schedule_data'] as Map<String, dynamic>?) ??
+            (res['parameters'] as Map<String, dynamic>?) ??
+            {};
+
+        List<String>? times;
+        final rawTimes = scheduleData['times'];
+        if (rawTimes is String) {
+          times = rawTimes.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+        } else if (rawTimes is List) {
+          times = rawTimes.map((e) => e.toString()).toList();
+        }
 
         Navigator.of(context).pop(); // Close voice modal
         
         ReviewScheduleBottomSheet.show(
           context: context,
           apiService: widget.apiService,
-          initialName: params['name'] as String?,
-          initialDosage: params['dosage'] as String?,
-          initialFrequency: params['frequency'] as String?,
+          initialName: scheduleData['name'] as String?,
+          initialDosage: scheduleData['dosage'] as String?,
+          initialFrequency: scheduleData['frequency'] as String?,
           initialTimes: times,
-          initialDurationWeeks: params['duration_weeks'] as int?,
-          initialInstructions: params['instructions'] as String?,
+          initialDurationWeeks: scheduleData['duration_weeks'] as int?,
+          initialInstructions: scheduleData['instructions'] as String?,
           dependentId: widget.dependentId,
           onSaved: widget.onScheduleCreated,
         );
-      } else if (action == 'record_dose') {
+      } else if (action == 'RECORD_DOSE') {
+        final doseData = (res['record_dose_data'] as Map<String, dynamic>?) ??
+            (res['parameters'] as Map<String, dynamic>?) ??
+            {};
+        final medName = (doseData['name'] as String?) ?? 'Medication';
+        final doseStatus = (doseData['status'] as String?) ?? 'taken';
+
         Navigator.of(context).pop();
-        final medName = params['name'] ?? 'Medication';
-        final status = params['status'] ?? 'taken';
-        
-        if (widget.onDoseLogged != null) {
-          widget.onDoseLogged!(
-            'Logged dose for $medName as $status',
-            onUndo: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Undone dose for $medName'),
-                  backgroundColor: AppColors.info,
-                ),
-              );
+
+        // Query today's doses to find matching pending dose
+        try {
+          final todayDoses = await widget.apiService.getTodayDoses(dependentId: widget.dependentId);
+          final matchingDose = todayDoses.firstWhere(
+            (d) {
+              final dName = (d['medication_name'] as String? ?? '').toLowerCase();
+              return dName.contains(medName.toLowerCase()) && d['status'] == 'pending';
             },
+            orElse: () => null,
           );
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              backgroundColor: AppColors.success,
-              content: Text('Logged dose for $medName ($status)'),
-            ),
-          );
+
+          if (matchingDose != null) {
+            final doseId = matchingDose['id'] as int;
+            await widget.apiService.takeDose(doseId);
+
+            widget.onDoseLogged?.call(
+              'Logged dose for $medName as $doseStatus',
+              onUndo: () async {
+                await widget.apiService.undoDose(doseId);
+                widget.onScheduleCreated?.call();
+              },
+            );
+          } else {
+            // No matching pending dose found
+            widget.onDoseLogged?.call(
+              'No pending dose for "$medName" found on today\'s schedule.',
+            );
+          }
+        } catch (err) {
+          widget.onDoseLogged?.call('Failed to record dose: $err');
         }
       } else {
         // get_schedule or general response

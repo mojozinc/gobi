@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -e
 
-DEVICE_IP=192.168.0.106
-DEVICE_PORT=38787
+DEVICE_IP="${DEVICE_IP:-192.168.0.106}"
+DEVICE_PORT="${DEVICE_PORT:-38787}"
 
 # Ensure adb and agy paths are available
 export PATH="$HOME/android-sdk/platform-tools:$HOME/development/flutter/bin:$HOME/.gemini/antigravity-cli/bin:$HOME/.local/bin:$PATH"

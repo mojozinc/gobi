@@ -243,7 +243,9 @@ class _MedicationsScreenState extends State<MedicationsScreen> {
       dependentId: widget.dependentId,
       onScheduleCreated: _loadData,
       onDoseLogged: (msg, {onUndo}) {
+        if (!mounted) return;
         _loadData();
+        ScaffoldMessenger.of(context).clearSnackBars();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(msg),
@@ -252,7 +254,10 @@ class _MedicationsScreenState extends State<MedicationsScreen> {
                 ? SnackBarAction(
                     label: 'UNDO',
                     textColor: AppColors.warning,
-                    onPressed: onUndo,
+                    onPressed: () {
+                      onUndo();
+                      if (mounted) _loadData();
+                    },
                   )
                 : null,
           ),

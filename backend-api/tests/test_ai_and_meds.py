@@ -175,3 +175,53 @@ async def test_anonymous_login_and_persistence():
         assert res2.status_code == 200
         data2 = res2.json()
         assert data2["user"]["id"] == data["user"]["id"]
+
+@pytest.mark.asyncio
+async def test_dependent_idor_and_scheduling_edge_cases():
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        # Register user A
+        res_a = await client.post("/api/v1/auth/register", json={
+            "email": "user_a@example.com",
+            "password": "Password123!",
+            "name": "User A"
+        })
+        token_a = res_a.json()["token"]
+        headers_a = {"Authorization": f"Bearer {token_a}"}
+
+        # User A creates dependent
+        dep_res = await client.post("/api/v1/dependents", headers=headers_a, json={
+            "name": "User A Dependent",
+            "relationship_type": "child"
+        })
+        dep_id_a = dep_res.json()["id"]
+
+        # Register user B
+        res_b = await client.post("/api/v1/auth/register", json={
+            "email": "user_b@example.com",
+            "password": "Password123!",
+            "name": "User B"
+        })
+        token_b = res_b.json()["token"]
+        headers_b = {"Authorization": f"Bearer {token_b}"}
+
+        # User B attempts to attach medication to User A's dependent (IDOR attempt)
+        res_attack = await client.post("/api/v1/medications", headers=headers_b, json={
+            "name": "Malicious Med",
+            "dependent_id": dep_id_a,
+            "frequency": "daily"
+        })
+        assert res_attack.status_code == 404
+
+        # User B creates valid twice_daily medication with custom times
+        res_med = await client.post("/api/v1/medications", headers=headers_b, json={
+            "name": "Metformin",
+            "dosage": "500mg",
+            "frequency": "twice_daily",
+            "times": "08:00, 20:00",
+            "duration_weeks": 2
+        })
+        assert res_med.status_code == 201
+        med_b = res_med.json()
+        # 2 weeks * 7 days * 2 times = 28 doses
+        assert med_b["inventory_count"] == 28
