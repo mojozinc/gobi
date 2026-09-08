@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../data/api/api_client.dart';
 import '../../data/repositories/auth_repository.dart';
 import '../../data/models/user.dart';
+import '../services/api_service.dart';
 
 // Shared Preferences Provider
 final sharedPreferencesProvider = Provider<SharedPreferences?>((ref) {
@@ -12,6 +13,12 @@ final sharedPreferencesProvider = Provider<SharedPreferences?>((ref) {
 // API Client Provider
 final apiClientProvider = Provider<ApiClient>((ref) {
   return ApiClient();
+});
+
+// New FastAPI Service Provider
+final apiServiceProvider = Provider<ApiService>((ref) {
+  final prefs = ref.watch(sharedPreferencesProvider);
+  return ApiService(prefs: prefs);
 });
 
 // Auth Repository Provider

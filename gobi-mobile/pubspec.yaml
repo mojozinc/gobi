@@ -19,6 +19,11 @@ dependencies:
 
   # Networking
   dio: ^5.4.0
+  http: ^1.2.2
+
+  # Hardware / Media
+  speech_to_text: ^7.0.0
+  image_picker: ^1.1.2
 
   # Local Storage & Database
   shared_preferences: ^2.2.2
