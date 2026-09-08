@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../medications/screens/medications_screen.dart';
+import '../../chat/screens/health_chat_screen.dart';
 import '../../documents/screens/documents_screen.dart';
 import '../../family/screens/family_screen.dart';
 import '../../settings/screens/settings_screen.dart';
@@ -17,18 +18,21 @@ class HomeScreen extends ConsumerStatefulWidget {
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   int _currentIndex = 0;
 
-  final List<Widget> _screens = const [
-    DashboardScreen(),
-    MedicationsScreen(),
-    DocumentsScreen(),
-    FamilyScreen(),
-    SettingsScreen(),
-  ];
-
   @override
   Widget build(BuildContext context) {
+    final apiService = ref.watch(apiServiceProvider);
+
+    final List<Widget> screens = [
+      const DashboardScreen(),
+      MedicationsScreen(apiService: apiService),
+      HealthChatScreen(apiService: apiService),
+      const DocumentsScreen(),
+      const FamilyScreen(),
+      const SettingsScreen(),
+    ];
+
     return Scaffold(
-      body: _screens[_currentIndex],
+      body: screens[_currentIndex],
       bottomNavigationBar: NavigationBar(
         selectedIndex: _currentIndex,
         onDestinationSelected: (index) {
@@ -45,12 +49,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           NavigationDestination(
             icon: Icon(Icons.medication_outlined),
             selectedIcon: Icon(Icons.medication),
-            label: 'Medications',
+            label: 'Meds',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.chat_bubble_outline),
+            selectedIcon: Icon(Icons.chat_bubble),
+            label: 'AI Chat',
           ),
           NavigationDestination(
             icon: Icon(Icons.folder_outlined),
             selectedIcon: Icon(Icons.folder),
-            label: 'Documents',
+            label: 'Docs',
           ),
           NavigationDestination(
             icon: Icon(Icons.people_outline),
@@ -87,7 +96,7 @@ class DashboardScreen extends ConsumerWidget {
               style: Theme.of(context).textTheme.headlineSmall,
             ),
             Text(
-              'Welcome to Gobi',
+              'Welcome to Gobi Health Hub',
               style: Theme.of(context).textTheme.bodySmall,
             ),
           ],
@@ -106,18 +115,18 @@ class DashboardScreen extends ConsumerWidget {
                   children: [
                     Icon(
                       Icons.health_and_safety,
-                      size: 80,
+                      size: 72,
                       color: AppColors.primary.withOpacity(0.8),
                     ),
                     const SizedBox(height: 16),
                     Text(
-                      'Your Personal Medical Assistant',
+                      'Your Family Health & Medication Hub',
                       style: Theme.of(context).textTheme.titleLarge,
                       textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'Manage medications, track health records, and keep your family\'s medical information secure.',
+                      'AI-assisted voice scheduling, prescription scanning, and contextual health Q&A with OpenRouter.',
                       style: Theme.of(context).textTheme.bodyMedium,
                       textAlign: TextAlign.center,
                     ),
@@ -137,17 +146,17 @@ class DashboardScreen extends ConsumerWidget {
                 Expanded(
                   child: _StatCard(
                     icon: Icons.medication,
-                    title: 'Medications',
-                    value: '0',
+                    title: 'Active Meds',
+                    value: 'Active',
                     color: AppColors.primary,
                   ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: _StatCard(
-                    icon: Icons.folder,
-                    title: 'Documents',
-                    value: '0',
+                    icon: Icons.auto_awesome,
+                    title: 'OpenRouter AI',
+                    value: 'Online',
                     color: AppColors.accent,
                   ),
                 ),
@@ -159,45 +168,45 @@ class DashboardScreen extends ConsumerWidget {
                 Expanded(
                   child: _StatCard(
                     icon: Icons.people,
-                    title: 'Family',
-                    value: '1',
+                    title: 'Family Hub',
+                    value: '1 Profile',
                     color: AppColors.info,
                   ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: _StatCard(
-                    icon: Icons.calendar_today,
-                    title: 'Upcoming',
-                    value: '0',
+                    icon: Icons.document_scanner,
+                    title: 'Prescription OCR',
+                    value: 'Ready',
                     color: AppColors.warning,
                   ),
                 ),
               ],
             ),
             const SizedBox(height: 24),
-            // Coming Soon Section
+            // Feature Highlights Section
             Text(
-              'Coming Soon',
+              'Key Capabilities',
               style: Theme.of(context).textTheme.titleLarge,
             ),
             const SizedBox(height: 12),
-            _ComingSoonCard(
-              icon: Icons.notification_important,
-              title: 'Medication Reminders',
-              description: 'Get timely notifications for your medications',
+            _FeatureCard(
+              icon: Icons.mic,
+              title: 'Voice Medication Logging',
+              description: 'Speak schedules or doses naturally with in-app AI intent recognition.',
             ),
             const SizedBox(height: 8),
-            _ComingSoonCard(
+            _FeatureCard(
               icon: Icons.camera_alt,
-              title: 'Document Scanning',
-              description: 'Scan and store prescriptions and reports',
+              title: 'Multimodal Prescription Scanning',
+              description: 'Scan prescriptions using OpenRouter Multimodal Vision OCR.',
             ),
             const SizedBox(height: 8),
-            _ComingSoonCard(
-              icon: Icons.insights,
-              title: 'Health Insights',
-              description: 'Track and analyze your health trends',
+            _FeatureCard(
+              icon: Icons.psychology,
+              title: 'RAG Conversational Health Chat',
+              description: 'Ask questions grounded in your saved schedules, logs, and scanned docs.',
             ),
           ],
         ),
@@ -226,11 +235,11 @@ class _StatCard extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            Icon(icon, size: 32, color: color),
+            Icon(icon, size: 28, color: color),
             const SizedBox(height: 8),
             Text(
               value,
-              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     color: color,
                     fontWeight: FontWeight.bold,
                   ),
@@ -248,12 +257,12 @@ class _StatCard extends StatelessWidget {
   }
 }
 
-class _ComingSoonCard extends StatelessWidget {
+class _FeatureCard extends StatelessWidget {
   final IconData icon;
   final String title;
   final String description;
 
-  const _ComingSoonCard({
+  const _FeatureCard({
     required this.icon,
     required this.title,
     required this.description,
@@ -267,16 +276,8 @@ class _ComingSoonCard extends StatelessWidget {
           backgroundColor: AppColors.primary.withOpacity(0.1),
           child: Icon(icon, color: AppColors.primary),
         ),
-        title: Text(title),
-        subtitle: Text(description),
-        trailing: Chip(
-          label: const Text(
-            'Soon',
-            style: TextStyle(fontSize: 11),
-          ),
-          backgroundColor: AppColors.warning.withOpacity(0.2),
-          side: BorderSide.none,
-        ),
+        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
+        subtitle: Text(description, style: const TextStyle(fontSize: 12)),
       ),
     );
   }

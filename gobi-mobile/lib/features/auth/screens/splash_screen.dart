@@ -18,17 +18,28 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
   }
 
   Future<void> _checkAuthAndNavigate() async {
-    // Wait for splash animation
-    await Future.delayed(const Duration(seconds: 2));
+    // Brief splash delay for smooth visual transition
+    await Future.delayed(const Duration(milliseconds: 1200));
 
     if (!mounted) return;
 
-    final authState = ref.read(authStateProvider);
+    final apiService = ref.read(apiServiceProvider);
 
-    if (authState.isAuthenticated) {
+    // If token already saved, proceed directly to home
+    if (apiService.isAuthenticated) {
       Navigator.of(context).pushReplacementNamed('/home');
-    } else {
-      Navigator.of(context).pushReplacementNamed('/login');
+      return;
+    }
+
+    // Auto-login as anonymous / persistent guest user so user never has to log in
+    try {
+      await apiService.loginAnonymously();
+    } catch (e) {
+      debugPrint('Anonymous login attempt notice: $e');
+    }
+
+    if (mounted) {
+      Navigator.of(context).pushReplacementNamed('/home');
     }
   }
 
@@ -40,17 +51,24 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // App Logo (placeholder)
+            // App Logo
             Container(
-              width: 120,
-              height: 120,
+              width: 110,
+              height: 110,
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(24),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.15),
+                    blurRadius: 20,
+                    offset: const Offset(0, 10),
+                  ),
+                ],
               ),
               child: const Icon(
                 Icons.health_and_safety,
-                size: 80,
+                size: 72,
                 color: AppColors.primary,
               ),
             ),
@@ -58,22 +76,28 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
             const Text(
               'Gobi',
               style: TextStyle(
-                fontSize: 48,
+                fontSize: 42,
                 fontWeight: FontWeight.bold,
                 color: Colors.white,
+                letterSpacing: 1.2,
               ),
             ),
             const SizedBox(height: 8),
             const Text(
-              'Your Personal Medical Assistant',
+              'Family Health & Medication Hub',
               style: TextStyle(
-                fontSize: 16,
+                fontSize: 15,
                 color: Colors.white70,
               ),
             ),
             const SizedBox(height: 48),
-            const CircularProgressIndicator(
-              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+            const SizedBox(
+              width: 28,
+              height: 28,
+              child: CircularProgressIndicator(
+                strokeWidth: 2.5,
+                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+              ),
             ),
           ],
         ),

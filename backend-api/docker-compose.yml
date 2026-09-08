@@ -13,8 +13,8 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U gobi"]
-      interval: 10s
+      test: ["CMD-SHELL", "pg_isready -U gobi -d gobi_db"]
+      interval: 5s
       timeout: 5s
       retries: 5
 
@@ -26,14 +26,12 @@ services:
     environment:
       PORT: 8000
       ENV: development
-      DB_HOST: postgres
-      DB_PORT: 5432
-      DB_USER: gobi
-      DB_PASSWORD: gobi_password
-      DB_NAME: gobi_db
-      DB_SSLMODE: disable
+      DATABASE_URL: postgresql+asyncpg://gobi:gobi_password@postgres:5432/gobi_db
       JWT_SECRET: dev-secret-change-in-production
       JWT_EXPIRY_HOURS: 72
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      OPENROUTER_TEXT_MODEL: ${OPENROUTER_TEXT_MODEL:-meta-llama/llama-3.3-70b-instruct:free}
+      OPENROUTER_VISION_MODEL: ${OPENROUTER_VISION_MODEL:-google/gemini-2.0-flash-exp:free}
     depends_on:
       postgres:
         condition: service_healthy
