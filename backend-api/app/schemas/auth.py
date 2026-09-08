@@ -3,7 +3,7 @@ from typing import Optional
 from pydantic import BaseModel, EmailStr, ConfigDict
 
 class UserBase(BaseModel):
-    email: EmailStr
+    email: str
     name: str
     phone: Optional[str] = None
     photo_url: Optional[str] = None
@@ -17,6 +17,10 @@ class RegisterIn(BaseModel):
 class LoginIn(BaseModel):
     email: EmailStr
     password: str
+
+class AnonymousIn(BaseModel):
+    device_id: Optional[str] = None
+    name: Optional[str] = "Guest User"
 
 class UserOut(UserBase):
     id: int

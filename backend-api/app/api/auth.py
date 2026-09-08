@@ -1,9 +1,10 @@
+import uuid
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.db.session import get_db
-from app.db.models import User
-from app.schemas.auth import RegisterIn, LoginIn, TokenOut, UserOut, ProfileUpdateIn
+from app.db.models import User, Dependent
+from app.schemas.auth import RegisterIn, LoginIn, AnonymousIn, TokenOut, UserOut, ProfileUpdateIn
 from app.services.auth import verify_password, get_password_hash, create_access_token
 from app.api.deps import get_current_user
 
@@ -26,6 +27,16 @@ async def register(req: RegisterIn, db: AsyncSession = Depends(get_db)):
     await db.flush()
     await db.refresh(user)
 
+    # Automatically create default 'Self' dependent profile
+    dep = Dependent(
+        user_id=user.id,
+        name=user.name,
+        relationship_type="self",
+        notes="Primary profile"
+    )
+    db.add(dep)
+    await db.flush()
+
     token = create_access_token(user_id=user.id, email=user.email)
     return TokenOut(token=token, user=UserOut.model_validate(user))
 
@@ -35,6 +46,38 @@ async def login(req: LoginIn, db: AsyncSession = Depends(get_db)):
     user = res.scalar_one_or_none()
     if not user or not verify_password(req.password, user.password_hash):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password")
+
+    token = create_access_token(user_id=user.id, email=user.email)
+    return TokenOut(token=token, user=UserOut.model_validate(user))
+
+@router.post("/anonymous", response_model=TokenOut)
+async def anonymous_login(req: AnonymousIn, db: AsyncSession = Depends(get_db)):
+    device_id = req.device_id or uuid.uuid4().hex
+    email = f"guest_{device_id}@gobi.local"
+
+    res = await db.execute(select(User).where(User.email == email))
+    user = res.scalar_one_or_none()
+
+    if not user:
+        user = User(
+            email=email,
+            password_hash=get_password_hash(uuid.uuid4().hex),
+            name=req.name or "Guest User",
+            phone=None,
+        )
+        db.add(user)
+        await db.flush()
+        await db.refresh(user)
+
+        # Create default 'Self' dependent profile for seamless use
+        dep = Dependent(
+            user_id=user.id,
+            name=user.name,
+            relationship_type="self",
+            notes="Primary profile"
+        )
+        db.add(dep)
+        await db.flush()
 
     token = create_access_token(user_id=user.id, email=user.email)
     return TokenOut(token=token, user=UserOut.model_validate(user))

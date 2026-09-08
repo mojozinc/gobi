@@ -152,3 +152,26 @@ async def test_full_slice1_ai_and_medication_flow():
         chat = res.json()
         assert "response" in chat
         assert len(chat["response"]) > 0
+
+@pytest.mark.asyncio
+async def test_anonymous_login_and_persistence():
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        # First anonymous login with device id
+        res = await client.post("/api/v1/auth/anonymous", json={
+            "device_id": "test-device-uuid-123",
+            "name": "Guest Patient"
+        })
+        assert res.status_code == 200
+        data = res.json()
+        assert "token" in data
+        assert data["user"]["name"] == "Guest Patient"
+        assert data["user"]["email"] == "guest_test-device-uuid-123@gobi.local"
+
+        # Re-login with same device id returns same user
+        res2 = await client.post("/api/v1/auth/anonymous", json={
+            "device_id": "test-device-uuid-123"
+        })
+        assert res2.status_code == 200
+        data2 = res2.json()
+        assert data2["user"]["id"] == data["user"]["id"]

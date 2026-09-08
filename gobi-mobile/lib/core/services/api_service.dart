@@ -8,9 +8,16 @@ class ApiService {
   final String baseUrl;
   final SharedPreferences? prefs;
   String? _token;
+  Map<String, dynamic>? _user;
 
   ApiService({this.baseUrl = 'http://127.0.0.1:8000/api/v1', this.prefs}) {
     _token = prefs?.getString('auth_token');
+    final userStr = prefs?.getString('user_data');
+    if (userStr != null) {
+      try {
+        _user = jsonDecode(userStr);
+      } catch (_) {}
+    }
   }
 
   void setToken(String token) {
@@ -18,7 +25,23 @@ class ApiService {
     prefs?.setString('auth_token', token);
   }
 
+  void setUser(Map<String, dynamic> user) {
+    _user = user;
+    prefs?.setString('user_data', jsonEncode(user));
+  }
+
   String? get token => _token;
+  Map<String, dynamic>? get currentUser => _user;
+  bool get isAuthenticated => _token != null && _token!.isNotEmpty;
+
+  String getOrCreateDeviceId() {
+    String? id = prefs?.getString('device_installation_id');
+    if (id == null || id.isEmpty) {
+      id = 'dev_${DateTime.now().millisecondsSinceEpoch}_${(1000 + (DateTime.now().microsecond % 9000))}';
+      prefs?.setString('device_installation_id', id);
+    }
+    return id;
+  }
 
   Map<String, String> get _headers => {
     'Content-Type': 'application/json',
@@ -26,15 +49,39 @@ class ApiService {
   };
 
   // Auth
+  Future<Map<String, dynamic>> loginAnonymously({String? deviceId, String? name}) async {
+    final devId = deviceId ?? getOrCreateDeviceId();
+    final res = await http.post(
+      Uri.parse('$baseUrl/auth/anonymous'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'device_id': devId,
+        'name': name ?? 'Guest User',
+      }),
+    );
+    final data = jsonDecode(utf8.decode(res.bodyBytes));
+    if (res.statusCode == 200) {
+      setToken(data['token']);
+      if (data['user'] != null) {
+        setUser(data['user']);
+      }
+      return data;
+    }
+    throw Exception(data['detail'] ?? 'Anonymous login failed');
+  }
+
   Future<Map<String, dynamic>> login(String email, String password) async {
     final res = await http.post(
       Uri.parse('$baseUrl/auth/login'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({'email': email, 'password': password}),
     );
-    final data = jsonDecode(res.body);
+    final data = jsonDecode(utf8.decode(res.bodyBytes));
     if (res.statusCode == 200) {
       setToken(data['token']);
+      if (data['user'] != null) {
+        setUser(data['user']);
+      }
       return data;
     }
     throw Exception(data['detail'] ?? 'Login failed');
@@ -46,9 +93,12 @@ class ApiService {
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({'name': name, 'email': email, 'password': password}),
     );
-    final data = jsonDecode(res.body);
+    final data = jsonDecode(utf8.decode(res.bodyBytes));
     if (res.statusCode == 201) {
       setToken(data['token']);
+      if (data['user'] != null) {
+        setUser(data['user']);
+      }
       return data;
     }
     throw Exception(data['detail'] ?? 'Registration failed');

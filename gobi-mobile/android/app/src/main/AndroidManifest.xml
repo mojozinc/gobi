@@ -3,9 +3,11 @@
     <uses-permission android:name="android.permission.RECORD_AUDIO"/>
     <uses-permission android:name="android.permission.CAMERA"/>
     <application
-        android:label="gobi_mobile"
+        android:label="Gobi"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
+        android:allowBackup="true"
+        android:fullBackupContent="true"
         android:usesCleartextTraffic="true">
         <activity
             android:name=".MainActivity"
