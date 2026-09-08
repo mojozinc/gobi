@@ -21,6 +21,10 @@ We need a robust, scalable architecture that provides superior natural language 
 We adopt a **Server-Backed Agentic Architecture** powered by **FastAPI, PostgreSQL, and OpenRouter.ai**:
 
 1. **AI Processing Layer:** All LLM reasoning and multimodal vision tasks are orchestrated server-side in `backend-api` via **OpenRouter.ai** (`https://openrouter.ai/api/v1/chat/completions`) using structured JSON Schema tool calling.
+   - **Prototyping Phase Cost Optimization:** The system defaults to **100% Free OpenRouter Models** (`:free` endpoints), such as:
+     - **Voice Intent & Tool Calling:** `meta-llama/llama-3.3-70b-instruct:free` / `google/gemini-2.0-flash-exp:free` / `meta-llama/llama-3.1-8b-instruct:free`.
+     - **Prescription & Document Vision OCR:** `google/gemini-2.0-flash-exp:free` / `meta-llama/llama-3.2-11b-vision-instruct:free`.
+   - The model selection is fully parameterized via environment variables (`OPENROUTER_TEXT_MODEL` and `OPENROUTER_VISION_MODEL`) so production models can be switched seamlessly later.
 2. **Mobile Interaction:** The Flutter mobile app adopts a **Dashboard-First model with Contextual AI buttons** (*Voice Log* and *Scan Prescription*).
 3. **Voice Pipeline:** Hybrid execution—native device Speech-to-Text (`speech_to_text`) transcribes audio on the device, sending the text to `POST /api/v1/ai/parse-intent` on the backend for tool extraction.
 4. **Prescription OCR Pipeline:** Device camera/gallery captures prescription photos, sending multipart uploads to `POST /api/v1/ai/scan-prescription` on the backend, where OpenRouter Multimodal Vision (Gemini 1.5 Flash) extracts medications, dosages, frequency, and instructions.
