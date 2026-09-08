@@ -154,14 +154,19 @@ class _ReviewScheduleBottomSheetState extends State<ReviewScheduleBottomSheet> {
       if (mounted) {
         Navigator.of(context).pop();
         widget.onSaved?.call();
+        ScaffoldMessenger.of(context).clearSnackBars();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             backgroundColor: AppColors.success,
+            duration: const Duration(seconds: 3),
+            behavior: SnackBarBehavior.floating,
             content: Row(
               children: [
                 const Icon(Icons.check_circle, color: Colors.white),
                 const SizedBox(width: 8),
-                Text('Scheduled ${_nameController.text.trim()} successfully!'),
+                Expanded(
+                  child: Text('Scheduled ${_nameController.text.trim()} successfully!'),
+                ),
               ],
             ),
           ),
@@ -169,9 +174,12 @@ class _ReviewScheduleBottomSheetState extends State<ReviewScheduleBottomSheet> {
       }
     } catch (e) {
       if (mounted) {
+        ScaffoldMessenger.of(context).clearSnackBars();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             backgroundColor: AppColors.error,
+            duration: const Duration(seconds: 4),
+            behavior: SnackBarBehavior.floating,
             content: Text('Failed to save schedule: $e'),
           ),
         );

@@ -91,8 +91,13 @@ class _HealthChatScreenState extends State<HealthChatScreen> {
       final available = await _voiceService.initialize();
       if (!available) {
         if (mounted) {
+          ScaffoldMessenger.of(context).clearSnackBars();
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Speech recognition not available.')),
+            const SnackBar(
+              content: Text('Speech recognition not available.'),
+              duration: Duration(seconds: 3),
+              behavior: SnackBarBehavior.floating,
+            ),
           );
         }
         return;
@@ -104,14 +109,18 @@ class _HealthChatScreenState extends State<HealthChatScreen> {
 
       await _voiceService.startListening(
         onResult: (words) {
-          setState(() {
-            _textController.text = words;
-          });
+          if (mounted) {
+            setState(() {
+              _textController.text = words;
+            });
+          }
         },
         onError: (err) {
-          setState(() {
-            _isListening = false;
-          });
+          if (mounted) {
+            setState(() {
+              _isListening = false;
+            });
+          }
         },
       );
     }

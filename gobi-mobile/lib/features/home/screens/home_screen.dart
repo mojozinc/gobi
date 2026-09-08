@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/providers/app_providers.dart';
+import '../../../core/widgets/gobi_logo.dart';
 import '../../medications/screens/medications_screen.dart';
 import '../../chat/screens/health_chat_screen.dart';
 import '../../documents/screens/documents_screen.dart';
@@ -35,6 +36,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       body: screens[_currentIndex],
       bottomNavigationBar: NavigationBar(
         selectedIndex: _currentIndex,
+        height: 64,
+        labelBehavior: NavigationDestinationLabelBehavior.onlyShowSelected,
         onDestinationSelected: (index) {
           setState(() {
             _currentIndex = index;
@@ -113,10 +116,9 @@ class DashboardScreen extends ConsumerWidget {
                 padding: const EdgeInsets.all(20),
                 child: Column(
                   children: [
-                    Icon(
-                      Icons.health_and_safety,
-                      size: 72,
-                      color: AppColors.primary.withOpacity(0.8),
+                    const GobiLogo(
+                      size: 80,
+                      borderRadius: 18,
                     ),
                     const SizedBox(height: 16),
                     Text(
@@ -208,6 +210,7 @@ class DashboardScreen extends ConsumerWidget {
               title: 'RAG Conversational Health Chat',
               description: 'Ask questions grounded in your saved schedules, logs, and scanned docs.',
             ),
+            SizedBox(height: MediaQuery.of(context).padding.bottom + 32),
           ],
         ),
       ),

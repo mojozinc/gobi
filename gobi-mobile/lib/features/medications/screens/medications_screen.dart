@@ -85,6 +85,7 @@ class _MedicationsScreenState extends State<MedicationsScreen> {
           SnackBar(
             content: Text('Marked $medName as taken'),
             duration: const Duration(seconds: 5),
+            behavior: SnackBarBehavior.floating,
             action: SnackBarAction(
               label: 'UNDO',
               textColor: AppColors.warning,
@@ -96,9 +97,12 @@ class _MedicationsScreenState extends State<MedicationsScreen> {
     } catch (e) {
       _loadData(); // Revert on error
       if (mounted) {
+        ScaffoldMessenger.of(context).clearSnackBars();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             backgroundColor: AppColors.error,
+            duration: const Duration(seconds: 3),
+            behavior: SnackBarBehavior.floating,
             content: Text('Failed to update dose: $e'),
           ),
         );
@@ -118,20 +122,25 @@ class _MedicationsScreenState extends State<MedicationsScreen> {
     try {
       await _apiService.undoDose(doseId);
       if (mounted) {
+        ScaffoldMessenger.of(context).clearSnackBars();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             backgroundColor: AppColors.info,
             content: Text('Undone dose for $medName'),
             duration: const Duration(seconds: 3),
+            behavior: SnackBarBehavior.floating,
           ),
         );
       }
     } catch (e) {
       _loadData();
       if (mounted) {
+        ScaffoldMessenger.of(context).clearSnackBars();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             backgroundColor: AppColors.error,
+            duration: const Duration(seconds: 3),
+            behavior: SnackBarBehavior.floating,
             content: Text('Failed to undo dose: $e'),
           ),
         );
@@ -342,6 +351,7 @@ class _MedicationsScreenState extends State<MedicationsScreen> {
               ),
               const SizedBox(height: 12),
               _buildMedicationsList(),
+              SizedBox(height: MediaQuery.of(context).padding.bottom + 64),
             ],
           ),
         ),
