@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -e
 
+DEVICE_IP=192.168.0.106
+DEVICE_PORT=38787
+
 # Ensure adb and agy paths are available
 export PATH="$HOME/android-sdk/platform-tools:$HOME/development/flutter/bin:$HOME/.gemini/antigravity-cli/bin:$HOME/.local/bin:$PATH"
 
@@ -11,7 +14,7 @@ DEVICE=$(adb devices | grep -v "List of devices" | grep "device$" | awk '{print 
 
 if [ -z "$DEVICE" ]; then
     echo "⚠️  No ADB device currently attached. Attempting reconnect..."
-    adb connect 192.168.0.106:38787 >/dev/null 2>&1 || true
+    adb connect $DEVICE_IP:$DEVICE_PORT >/dev/null 2>&1 || true
     DEVICE=$(adb devices | grep -v "List of devices" | grep "device$" | awk '{print $1}' | head -n 1)
 fi
 
