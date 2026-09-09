@@ -6,6 +6,7 @@ import '../../../data/repositories/medications_repository.dart';
 class ReviewScheduleBottomSheet extends StatefulWidget {
   final ApiService? apiService;
   final MedicationsRepository? repository;
+  final String? medicationId;
   final String? initialName;
   final String? initialDosage;
   final String? initialFrequency;
@@ -19,6 +20,7 @@ class ReviewScheduleBottomSheet extends StatefulWidget {
     super.key,
     this.apiService,
     this.repository,
+    this.medicationId,
     this.initialName,
     this.initialDosage,
     this.initialFrequency,
@@ -33,6 +35,7 @@ class ReviewScheduleBottomSheet extends StatefulWidget {
     required BuildContext context,
     ApiService? apiService,
     MedicationsRepository? repository,
+    String? medicationId,
     String? initialName,
     String? initialDosage,
     String? initialFrequency,
@@ -53,6 +56,7 @@ class ReviewScheduleBottomSheet extends StatefulWidget {
         child: ReviewScheduleBottomSheet(
           apiService: apiService,
           repository: repository,
+          medicationId: medicationId,
           initialName: initialName,
           initialDosage: initialDosage,
           initialFrequency: initialFrequency,
@@ -155,12 +159,21 @@ class _ReviewScheduleBottomSheetState extends State<ReviewScheduleBottomSheet> {
         if (widget.dependentId != null) 'dependent_id': widget.dependentId,
       };
 
-      if (widget.repository != null) {
-        await widget.repository!.addMedication(payload);
-      } else if (widget.apiService != null) {
-        await widget.apiService!.createMedication(payload);
-      }
+      final isEditing = widget.medicationId != null;
 
+      if (isEditing) {
+        if (widget.repository != null) {
+          await widget.repository!.updateMedication(widget.medicationId!, payload);
+        } else if (widget.apiService != null) {
+          await widget.apiService!.createMedication(payload);
+        }
+      } else {
+        if (widget.repository != null) {
+          await widget.repository!.addMedication(payload);
+        } else if (widget.apiService != null) {
+          await widget.apiService!.createMedication(payload);
+        }
+      }
 
       if (mounted) {
         Navigator.of(context).pop();
@@ -176,7 +189,11 @@ class _ReviewScheduleBottomSheetState extends State<ReviewScheduleBottomSheet> {
                 const Icon(Icons.check_circle, color: Colors.white),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: Text('Scheduled ${_nameController.text.trim()} successfully!'),
+                  child: Text(
+                    isEditing
+                        ? 'Updated ${_nameController.text.trim()} schedule successfully!'
+                        : 'Scheduled ${_nameController.text.trim()} successfully!',
+                  ),
                 ),
               ],
             ),
@@ -206,6 +223,8 @@ class _ReviewScheduleBottomSheetState extends State<ReviewScheduleBottomSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final isEditing = widget.medicationId != null;
+
     return Container(
       decoration: const BoxDecoration(
         color: Colors.white,
@@ -238,8 +257,8 @@ class _ReviewScheduleBottomSheetState extends State<ReviewScheduleBottomSheet> {
                       color: AppColors.primary.withOpacity(0.1),
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(
-                      Icons.auto_awesome,
+                    child: Icon(
+                      isEditing ? Icons.edit_note : Icons.auto_awesome,
                       color: AppColors.primary,
                       size: 24,
                     ),
@@ -250,13 +269,15 @@ class _ReviewScheduleBottomSheetState extends State<ReviewScheduleBottomSheet> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Review Medication Schedule',
+                          isEditing ? 'Edit Medication Schedule' : 'Review Medication Schedule',
                           style: Theme.of(context).textTheme.titleLarge?.copyWith(
                                 fontWeight: FontWeight.bold,
                               ),
                         ),
                         Text(
-                          'AI-extracted details. Edit anything before confirming.',
+                          isEditing
+                              ? 'Update dosage, frequency, times, or notes.'
+                              : 'AI-extracted details. Edit anything before confirming.',
                           style: Theme.of(context).textTheme.bodySmall?.copyWith(
                                 color: Colors.grey.shade600,
                               ),
@@ -397,7 +418,9 @@ class _ReviewScheduleBottomSheetState extends State<ReviewScheduleBottomSheet> {
                             )
                           : const Icon(Icons.check),
                       label: Text(
-                        _isSubmitting ? 'Saving...' : 'Confirm & Schedule',
+                        _isSubmitting
+                            ? 'Saving...'
+                            : (isEditing ? 'Save Changes' : 'Confirm & Schedule'),
                         style: const TextStyle(fontWeight: FontWeight.bold),
                       ),
                     ),
