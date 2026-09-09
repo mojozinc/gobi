@@ -174,5 +174,127 @@ void main() {
       expect(preservedMeds.length, 1);
       expect(preservedMeds.first['name'], 'Atorvastatin');
     });
+
+    test('updateMedication updates local schedule, regenerates doses, and records CDC UPDATE', () async {
+      final repository = MedicationsRepository(db, FailingApiService());
+
+      final medId = await repository.addMedication({
+        'name': 'Ibuprofen',
+        'dosage': '200mg',
+        'frequency': 'daily',
+        'times': ['08:00'],
+        'duration_weeks': 1,
+      });
+
+      // Update medication
+      await repository.updateMedication(medId, {
+        'name': 'Ibuprofen',
+        'dosage': '400mg',
+        'frequency': 'twice daily',
+        'times': ['08:00', '20:00'],
+        'duration_weeks': 1,
+        'instructions': 'Take with food',
+      });
+
+      final meds = await repository.getMedications();
+      expect(meds.first['dosage'], '400mg');
+      expect(meds.first['times_list'], ['08:00', '20:00']);
+      expect(meds.first['instructions'], 'Take with food');
+
+      final todayDoses = await repository.getTodayDoses();
+      expect(todayDoses.length, 2);
+
+      final cdcEvents = await db.getUnsyncedCdcEvents();
+      expect(cdcEvents.any((e) => e.entityId == medId && e.operation == 'UPDATE'), isTrue);
+    });
+
+    test('deleteMedication soft-deletes medication and removes pending doses', () async {
+      final repository = MedicationsRepository(db, FailingApiService());
+
+      final medId = await repository.addMedication({
+        'name': 'Omeprazole',
+        'dosage': '20mg',
+        'frequency': 'daily',
+        'times': ['07:00'],
+        'duration_weeks': 1,
+      });
+
+      expect((await repository.getMedications()).length, 1);
+      expect((await repository.getTodayDoses()).length, 1);
+
+      await repository.deleteMedication(medId);
+
+      // Active medications list must no longer contain deleted medication
+      expect((await repository.getMedications()).isEmpty, isTrue);
+
+      // Pending doses must no longer be returned
+      expect((await repository.getTodayDoses()).isEmpty, isTrue);
+
+      final cdcEvents = await db.getUnsyncedCdcEvents();
+      expect(cdcEvents.any((e) => e.entityId == medId && e.operation == 'DELETE'), isTrue);
+    });
+
+    test('toggleMedicationPause holds and resumes pending doses', () async {
+      final repository = MedicationsRepository(db, FailingApiService());
+
+      final medId = await repository.addMedication({
+        'name': 'Sertraline',
+        'dosage': '50mg',
+        'frequency': 'daily',
+        'times': ['09:00'],
+        'duration_weeks': 1,
+      });
+
+      // Toggle to pause
+      final isPaused = await repository.toggleMedicationPause(medId);
+      expect(isPaused, isTrue);
+
+      // Toggle to resume
+      final isResumed = await repository.toggleMedicationPause(medId);
+      expect(isResumed, isFalse);
+    });
+
+    test('seedSampleData populates Amoxicillin, Prednisone, and Metformin across all 3 tiers', () async {
+      final repository = MedicationsRepository(db, FailingApiService());
+
+      await repository.seedSampleData(clearExisting: true);
+
+      final meds = await repository.getMedications();
+      expect(meds.length, 3);
+      expect(meds.any((m) => m['name'] == 'Amoxicillin'), isTrue);
+      expect(meds.any((m) => m['name'] == 'Prednisone'), isTrue);
+      expect(meds.any((m) => m['name'] == 'Metformin'), isTrue);
+
+      // Verify diagnostics
+      final stats = await repository.getDbDiagnostics();
+      expect(stats['active_medications'], 3);
+      expect(stats['total_doses']! > 100, isTrue);
+
+      // Verify full dose history for Tier 1 Amoxicillin
+      final amoxDoses = await repository.getAllDosesForMedication('sample-med-amoxicillin-5d');
+      expect(amoxDoses.length, 15); // 5 days * 3 doses
+
+      // Verify full dose history for Tier 2 Prednisone
+      final predDoses = await repository.getAllDosesForMedication('sample-med-prednisone-4w');
+      expect(predDoses.length, 56); // 28 days * 2 doses
+
+      // Verify full dose history for Tier 3 Metformin
+      final metDoses = await repository.getAllDosesForMedication('sample-med-metformin-12w');
+      expect(metDoses.length, 168); // 84 days * 2 doses
+    });
+
+    test('clearAllLocalData wipes all local SQLite tables', () async {
+      final repository = MedicationsRepository(db, FailingApiService());
+
+      await repository.seedSampleData(clearExisting: true);
+      expect((await repository.getMedications()).length, 3);
+
+      await repository.clearAllLocalData();
+      expect((await repository.getMedications()).isEmpty, isTrue);
+
+      final stats = await repository.getDbDiagnostics();
+      expect(stats['active_medications'], 0);
+      expect(stats['total_doses'], 0);
+    });
   });
 }

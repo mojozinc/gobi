@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import '../local/app_database.dart';
+import '../local/test_data_hydrator.dart';
 import '../../core/services/api_service.dart';
 
 enum SyncStatus {
@@ -55,6 +56,31 @@ class MedicationsRepository {
     return _db.watchTodayDosesWithMedication(dependentId: dependentId, date: date).map((dosesWithMed) {
       return dosesWithMed.map((item) => item.toJson()).toList();
     });
+  }
+
+  /// Observes all doses across history and future schedule for a medication.
+  Stream<List<DoseLogEntry>> watchAllDosesForMedication(String medicationId) {
+    return _db.watchAllDosesForMedication(medicationId);
+  }
+
+  /// Gets all doses for a medication as a Future list.
+  Future<List<DoseLogEntry>> getAllDosesForMedication(String medicationId) {
+    return _db.getAllDosesForMedication(medicationId);
+  }
+
+  /// Seeds sample datasets (Amoxicillin, Prednisone, Metformin). Guarded by kDebugMode.
+  Future<void> seedSampleData({bool clearExisting = false}) async {
+    await TestDataHydrator.seedSampleDatasets(_db, clearExisting: clearExisting);
+  }
+
+  /// Wipes all local SQLite tables. Guarded by kDebugMode.
+  Future<void> clearAllLocalData() async {
+    await TestDataHydrator.clearAllLocalData(_db);
+  }
+
+  /// Retrieves local database diagnostics counts.
+  Future<Map<String, int>> getDbDiagnostics() async {
+    return TestDataHydrator.getDiagnostics(_db);
   }
 
   /// Gets current active medications snapshot from local database.
@@ -127,6 +153,47 @@ class MedicationsRepository {
     _backgroundCloudCreate(data, medId);
 
     return medId;
+  }
+
+  /// Updates a medication schedule in local SQLite and updates upcoming doses.
+  Future<void> updateMedication(String id, Map<String, dynamic> data) async {
+    final name = (data['name'] as String?)?.trim() ?? 'Medication';
+    final dosage = (data['dosage'] as String?)?.trim() ?? '1 dose';
+    final unit = (data['unit'] as String?)?.trim() ?? '';
+    final frequency = (data['frequency'] as String?)?.trim() ?? 'daily';
+    final durationWeeks = (data['duration_weeks'] as int?) ?? 1;
+    final instructions = data['instructions'] as String?;
+    final inventoryCount = data['inventory_count'] as int?;
+
+    List<String> times = ['08:00'];
+    final rawTimes = data['times'];
+    if (rawTimes is String && rawTimes.isNotEmpty) {
+      times = rawTimes.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+    } else if (rawTimes is List && rawTimes.isNotEmpty) {
+      times = rawTimes.map((e) => e.toString()).toList();
+    }
+
+    await _db.updateMedicationAndDoses(
+      medicationId: id,
+      name: name,
+      dosage: dosage,
+      unit: unit,
+      frequencyType: frequency,
+      timesOfDay: times,
+      durationWeeks: durationWeeks,
+      instructions: instructions,
+      inventoryCount: inventoryCount,
+    );
+  }
+
+  /// Soft-deletes a medication from local SQLite and removes pending doses.
+  Future<void> deleteMedication(String id) async {
+    await _db.deleteMedication(medicationId: id);
+  }
+
+  /// Toggles pause status for a medication's upcoming pending doses.
+  Future<bool> toggleMedicationPause(String id) async {
+    return await _db.toggleMedicationPause(medicationId: id);
   }
 
   /// Marks a dose as taken in local SQLite with CDC logging, and syncs in background.
