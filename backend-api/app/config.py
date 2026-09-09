@@ -7,6 +7,7 @@ class Settings(BaseSettings):
     VERSION: str = "0.1.0"
     ENV: str = "development"
     PORT: int = 8000
+    LOG_LEVEL: str = "DEBUG"
     
     # Database
     DATABASE_URL: str = "postgresql+asyncpg://gobi:gobi_password@localhost:5432/gobi_db"

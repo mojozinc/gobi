@@ -351,6 +351,7 @@ class OpenRouterService:
             "temperature": 0.3
         }
 
+        logger.debug(f"Calling OpenRouter chat_rag with model: {self.text_model}, query: {query[:60]}...")
         try:
             async with httpx.AsyncClient(timeout=20.0) as client:
                 res = await client.post(
@@ -364,9 +365,10 @@ class OpenRouterService:
                     if choices:
                         content = choices[0].get("message", {}).get("content")
                         if content:
+                            logger.debug(f"OpenRouter chat_rag succeeded: {content[:80]}...")
                             return content
                 else:
-                    logger.warning(f"OpenRouter RAG chat returned status {res.status_code}: {res.text}")
+                    logger.error(f"OpenRouter RAG chat returned status {res.status_code}: {res.text}")
         except Exception as e:
             logger.error(f"RAG chat call failed: {e}")
 
