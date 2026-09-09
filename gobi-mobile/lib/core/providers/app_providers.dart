@@ -80,11 +80,15 @@ class ChatMessage {
   final String text;
   final bool isUser;
   final DateTime timestamp;
+  final bool isError;
+  final String? failedQuery;
 
   ChatMessage({
     required this.text,
     required this.isUser,
     DateTime? timestamp,
+    this.isError = false,
+    this.failedQuery,
   }) : timestamp = timestamp ?? DateTime.now();
 
   Map<String, String> toApiMap() => {
@@ -111,6 +115,16 @@ class ChatMessagesNotifier extends StateNotifier<List<ChatMessage>> {
 
   void addMessage(ChatMessage message) {
     state = [...state, message];
+  }
+
+  void removeLastIfError() {
+    if (state.isNotEmpty && state.last.isError) {
+      state = state.sublist(0, state.length - 1);
+    }
+  }
+
+  void removeMessage(ChatMessage message) {
+    state = state.where((m) => m != message).toList();
   }
 }
 

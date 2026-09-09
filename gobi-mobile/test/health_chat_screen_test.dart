@@ -95,4 +95,100 @@ void main() {
     ScaffoldMessenger.of(tester.element(find.byType(HealthChatScreen))).removeCurrentSnackBar();
     await tester.pump(const Duration(milliseconds: 100));
   });
+
+  testWidgets('HealthChatScreen displays retry button on error and retrying successfully recovers', (WidgetTester tester) async {
+    bool shouldFail = true;
+    final testApi = _MockChatApiService(
+      chatHandler: (query, history) async {
+        if (shouldFail) {
+          throw Exception('Network unreachable');
+        }
+        return {'response': 'Here is your medication advice.'};
+      },
+    );
+
+    final container = ProviderContainer();
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(
+          home: HealthChatScreen(apiService: testApi),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    // Enter message in text field and submit
+    await tester.enterText(find.byType(TextField), 'What are my doses?');
+    await tester.tap(find.byIcon(Icons.send));
+    await tester.pump();
+    await tester.pumpAndSettle();
+
+    // Verify error card appeared
+    expect(find.text('Delivery Failed'), findsOneWidget);
+    expect(find.textContaining('Unable to reach health assistant: Exception: Network unreachable'), findsOneWidget);
+    expect(find.text('Tap to retry'), findsOneWidget);
+
+    // Switch mock to succeed on retry
+    shouldFail = false;
+
+    // Tap "Tap to retry" button
+    await tester.tap(find.text('Tap to retry'));
+    await tester.pump();
+    await tester.pumpAndSettle();
+
+    // Verify error is cleared and assistant response is rendered
+    expect(find.text('Delivery Failed'), findsNothing);
+    expect(find.text('Here is your medication advice.'), findsOneWidget);
+  });
+
+  testWidgets('Tapping user message bubble populates input field and allows resending', (WidgetTester tester) async {
+    final testApi = _MockChatApiService(
+      chatHandler: (query, history) async {
+        return {'response': 'Response to: $query'};
+      },
+    );
+
+    final container = ProviderContainer();
+    container.read(chatMessagesProvider.notifier).addMessage(
+          ChatMessage(text: 'Check my prescription', isUser: true),
+        );
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(
+          home: HealthChatScreen(apiService: testApi),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    // Tap user message bubble
+    await tester.tap(find.text('Check my prescription'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    // Verify text is loaded in the textfield
+    final textField = tester.widget<TextField>(find.byType(TextField));
+    expect(textField.controller?.text, equals('Check my prescription'));
+
+    // Clean up snackbar
+    ScaffoldMessenger.of(tester.element(find.byType(HealthChatScreen))).removeCurrentSnackBar();
+    await tester.pump(const Duration(milliseconds: 100));
+  });
+}
+
+class _MockChatApiService extends ApiService {
+  final Future<Map<String, dynamic>> Function(String query, List<Map<String, String>>? history) chatHandler;
+
+  _MockChatApiService({required this.chatHandler}) : super(baseUrl: 'http://127.0.0.1:8000/api/v1');
+
+  @override
+  Future<Map<String, dynamic>> sendHealthChat(String query, {int? dependentId, List<Map<String, String>>? history}) {
+    return chatHandler(query, history);
+  }
 }
