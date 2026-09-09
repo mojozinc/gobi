@@ -30,8 +30,8 @@ services:
       JWT_SECRET: dev-secret-change-in-production
       JWT_EXPIRY_HOURS: 72
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
-      OPENROUTER_TEXT_MODEL: ${OPENROUTER_TEXT_MODEL:-meta-llama/llama-3.3-70b-instruct:free}
-      OPENROUTER_VISION_MODEL: ${OPENROUTER_VISION_MODEL:-google/gemini-2.0-flash-exp:free}
+      OPENROUTER_TEXT_MODEL: ${OPENROUTER_TEXT_MODEL:-meta-llama/llama-3.3-70b-instruct}
+      OPENROUTER_VISION_MODEL: ${OPENROUTER_VISION_MODEL:-google/gemini-3.8-flash}
     depends_on:
       postgres:
         condition: service_healthy

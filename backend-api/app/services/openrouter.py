@@ -360,7 +360,13 @@ class OpenRouterService:
                 )
                 if res.status_code == 200:
                     data = res.json()
-                    return data["choices"][0]["message"]["content"]
+                    choices = data.get("choices", [])
+                    if choices:
+                        content = choices[0].get("message", {}).get("content")
+                        if content:
+                            return content
+                else:
+                    logger.warning(f"OpenRouter RAG chat returned status {res.status_code}: {res.text}")
         except Exception as e:
             logger.error(f"RAG chat call failed: {e}")
 

@@ -9,7 +9,14 @@ class AppConfig {
     'API_VERSION',
     defaultValue: '/api/v1',
   );
-  static const String apiBaseUrl = '$baseUrl$apiVersion';
+  static String get apiBaseUrl {
+    final cleanBase = baseUrl.endsWith('/') ? baseUrl.substring(0, baseUrl.length - 1) : baseUrl;
+    final cleanVersion = apiVersion.startsWith('/') ? apiVersion : '/$apiVersion';
+    if (cleanBase.endsWith(cleanVersion)) {
+      return cleanBase;
+    }
+    return '$cleanBase$cleanVersion';
+  }
 
   // App Information
   static const String appName = 'Gobi';

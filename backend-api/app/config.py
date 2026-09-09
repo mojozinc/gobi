@@ -22,8 +22,8 @@ class Settings(BaseSettings):
     # OpenRouter
     OPENROUTER_API_KEY: str = ""
     OPENROUTER_BASE_URL: str = "https://openrouter.ai/api/v1"
-    OPENROUTER_TEXT_MODEL: str = "meta-llama/llama-3.3-70b-instruct:free"
-    OPENROUTER_VISION_MODEL: str = "google/gemini-2.0-flash-exp:free"
+    OPENROUTER_TEXT_MODEL: str = "meta-llama/llama-3.3-70b-instruct"
+    OPENROUTER_VISION_MODEL: str = "google/gemini-3.8-flash"
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 

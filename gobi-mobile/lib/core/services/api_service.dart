@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import '../config/app_config.dart';
 
 class ApiService {
   final String baseUrl;
@@ -11,10 +12,11 @@ class ApiService {
   Map<String, dynamic>? _user;
 
   ApiService({
-    this.baseUrl = 'http://127.0.0.1:8000/api/v1',
+    String? baseUrl,
     this.prefs,
     http.Client? client,
-  }) : _client = client ?? http.Client() {
+  })  : baseUrl = baseUrl ?? AppConfig.apiBaseUrl,
+        _client = client ?? http.Client() {
     _token = prefs?.getString('auth_token');
     final userStr = prefs?.getString('user_data');
     if (userStr != null) {

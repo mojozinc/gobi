@@ -5,6 +5,7 @@ import '../../data/local/app_database.dart';
 import '../../data/repositories/auth_repository.dart';
 import '../../data/repositories/medications_repository.dart';
 import '../../data/models/user.dart';
+import '../config/app_config.dart';
 import '../services/api_service.dart';
 
 // Shared Preferences Provider
@@ -24,10 +25,13 @@ final apiClientProvider = Provider<ApiClient>((ref) {
   return ApiClient();
 });
 
-// New FastAPI Service Provider
+// FastAPI Service Provider
 final apiServiceProvider = Provider<ApiService>((ref) {
   final prefs = ref.watch(sharedPreferencesProvider);
-  return ApiService(prefs: prefs);
+  return ApiService(
+    baseUrl: AppConfig.apiBaseUrl,
+    prefs: prefs,
+  );
 });
 
 // Medications Repository Provider (Local First + Cloud Sync)
