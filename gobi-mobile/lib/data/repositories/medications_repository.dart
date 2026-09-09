@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import '../local/app_database.dart';
+import '../local/test_data_hydrator.dart';
 import '../../core/services/api_service.dart';
 
 enum SyncStatus {
@@ -55,6 +56,31 @@ class MedicationsRepository {
     return _db.watchTodayDosesWithMedication(dependentId: dependentId, date: date).map((dosesWithMed) {
       return dosesWithMed.map((item) => item.toJson()).toList();
     });
+  }
+
+  /// Observes all doses across history and future schedule for a medication.
+  Stream<List<DoseLogEntry>> watchAllDosesForMedication(String medicationId) {
+    return _db.watchAllDosesForMedication(medicationId);
+  }
+
+  /// Gets all doses for a medication as a Future list.
+  Future<List<DoseLogEntry>> getAllDosesForMedication(String medicationId) {
+    return _db.getAllDosesForMedication(medicationId);
+  }
+
+  /// Seeds sample datasets (Amoxicillin, Prednisone, Metformin). Guarded by kDebugMode.
+  Future<void> seedSampleData({bool clearExisting = false}) async {
+    await TestDataHydrator.seedSampleDatasets(_db, clearExisting: clearExisting);
+  }
+
+  /// Wipes all local SQLite tables. Guarded by kDebugMode.
+  Future<void> clearAllLocalData() async {
+    await TestDataHydrator.clearAllLocalData(_db);
+  }
+
+  /// Retrieves local database diagnostics counts.
+  Future<Map<String, int>> getDbDiagnostics() async {
+    return TestDataHydrator.getDiagnostics(_db);
   }
 
   /// Gets current active medications snapshot from local database.

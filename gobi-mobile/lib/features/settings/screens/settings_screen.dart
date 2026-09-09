@@ -1,8 +1,10 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/providers/app_providers.dart';
+import '../../../data/local/test_data_hydrator.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -146,6 +148,103 @@ class SettingsScreen extends ConsumerWidget {
             },
           ),
           const Divider(),
+          if (kDebugMode) ...[
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Text(
+                'DEVELOPER OPTIONS (DEBUG ONLY)',
+                style: TextStyle(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.primary,
+                  letterSpacing: 1.1,
+                ),
+              ),
+            ),
+            _SettingsTile(
+              icon: Icons.science_outlined,
+              iconColor: AppColors.primary,
+              title: 'Seed Sample Medications',
+              subtitle: 'Populate 3 rich datasets (Amoxicillin, Prednisone, Metformin)',
+              onTap: () async {
+                final db = ref.read(appDatabaseProvider);
+                await TestDataHydrator.seedSampleDatasets(db, clearExisting: false);
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Sample datasets seeded into SQLite!')),
+                  );
+                }
+              },
+            ),
+            _SettingsTile(
+              icon: Icons.refresh,
+              iconColor: AppColors.warning,
+              title: 'Reset & Re-Seed Test Data',
+              subtitle: 'Wipe local database and reload fresh sample datasets',
+              onTap: () async {
+                final db = ref.read(appDatabaseProvider);
+                await TestDataHydrator.seedSampleDatasets(db, clearExisting: true);
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Local database wiped and re-seeded!')),
+                  );
+                }
+              },
+            ),
+            _SettingsTile(
+              icon: Icons.delete_outline,
+              iconColor: AppColors.error,
+              title: 'Clear Local Database',
+              subtitle: 'Reset to an empty state for zero-data testing',
+              onTap: () async {
+                final db = ref.read(appDatabaseProvider);
+                await TestDataHydrator.clearAllLocalData(db);
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Local database cleared.')),
+                  );
+                }
+              },
+            ),
+            _SettingsTile(
+              icon: Icons.analytics_outlined,
+              iconColor: AppColors.accent,
+              title: 'Database Diagnostics',
+              subtitle: 'Inspect local SQLite records and sync queue status',
+              onTap: () async {
+                final db = ref.read(appDatabaseProvider);
+                final stats = await TestDataHydrator.getDiagnostics(db);
+                if (context.mounted) {
+                  showDialog(
+                    context: context,
+                    builder: (ctx) => AlertDialog(
+                      title: const Text('Database Diagnostics'),
+                      content: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Active Medications: ${stats['active_medications']}'),
+                          const SizedBox(height: 6),
+                          Text('Today Doses: ${stats['today_doses']}'),
+                          const SizedBox(height: 6),
+                          Text('Total Dose Logs: ${stats['total_doses']}'),
+                          const SizedBox(height: 6),
+                          Text('Unsynced CDC Events: ${stats['unsynced_cdc_events']}'),
+                        ],
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(ctx),
+                          child: const Text('Close'),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+              },
+            ),
+            const Divider(),
+          ],
           // Logout
           _SettingsTile(
             icon: Icons.logout,

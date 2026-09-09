@@ -253,5 +253,48 @@ void main() {
       final isResumed = await repository.toggleMedicationPause(medId);
       expect(isResumed, isFalse);
     });
+
+    test('seedSampleData populates Amoxicillin, Prednisone, and Metformin across all 3 tiers', () async {
+      final repository = MedicationsRepository(db, FailingApiService());
+
+      await repository.seedSampleData(clearExisting: true);
+
+      final meds = await repository.getMedications();
+      expect(meds.length, 3);
+      expect(meds.any((m) => m['name'] == 'Amoxicillin'), isTrue);
+      expect(meds.any((m) => m['name'] == 'Prednisone'), isTrue);
+      expect(meds.any((m) => m['name'] == 'Metformin'), isTrue);
+
+      // Verify diagnostics
+      final stats = await repository.getDbDiagnostics();
+      expect(stats['active_medications'], 3);
+      expect(stats['total_doses']! > 100, isTrue);
+
+      // Verify full dose history for Tier 1 Amoxicillin
+      final amoxDoses = await repository.getAllDosesForMedication('sample-med-amoxicillin-5d');
+      expect(amoxDoses.length, 15); // 5 days * 3 doses
+
+      // Verify full dose history for Tier 2 Prednisone
+      final predDoses = await repository.getAllDosesForMedication('sample-med-prednisone-4w');
+      expect(predDoses.length, 56); // 28 days * 2 doses
+
+      // Verify full dose history for Tier 3 Metformin
+      final metDoses = await repository.getAllDosesForMedication('sample-med-metformin-12w');
+      expect(metDoses.length, 168); // 84 days * 2 doses
+    });
+
+    test('clearAllLocalData wipes all local SQLite tables', () async {
+      final repository = MedicationsRepository(db, FailingApiService());
+
+      await repository.seedSampleData(clearExisting: true);
+      expect((await repository.getMedications()).length, 3);
+
+      await repository.clearAllLocalData();
+      expect((await repository.getMedications()).isEmpty, isTrue);
+
+      final stats = await repository.getDbDiagnostics();
+      expect(stats['active_medications'], 0);
+      expect(stats['total_doses'], 0);
+    });
   });
 }

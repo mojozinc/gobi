@@ -212,6 +212,7 @@ class AppDatabase extends _$AppDatabase {
     await transaction(() async {
       await into(medications).insertOnConflictUpdate(medCompanion);
 
+    // notes - why is it specific to duration_weeks ? analyse if splitting into value, unit is better ?
       await recordCdcEvent(
         entityType: 'medication',
         entityId: medId,
@@ -230,7 +231,7 @@ class AppDatabase extends _$AppDatabase {
         },
       );
 
-      final daysToGenerate = (durationWeeks * 7).clamp(1, 14);
+      final daysToGenerate = (durationWeeks * 7).clamp(1, 365);
       for (int dayOffset = 0; dayOffset < daysToGenerate; dayOffset++) {
         final date = now.add(Duration(days: dayOffset));
         for (final timeStr in timesOfDay) {
@@ -268,6 +269,22 @@ class AppDatabase extends _$AppDatabase {
     });
 
     return medId;
+  }
+
+  /// Observes all dose logs for a specific medication (ordered by scheduled time ascending).
+  Stream<List<DoseLogEntry>> watchAllDosesForMedication(String medicationId) {
+    return (select(doseLogs)
+          ..where((tbl) => tbl.medicationId.equals(medicationId) & tbl.isDeleted.equals(false))
+          ..orderBy([(tbl) => OrderingTerm(expression: tbl.scheduledTime, mode: OrderingMode.asc)]))
+        .watch();
+  }
+
+  /// Gets all dose logs for a specific medication as a Future list.
+  Future<List<DoseLogEntry>> getAllDosesForMedication(String medicationId) {
+    return (select(doseLogs)
+          ..where((tbl) => tbl.medicationId.equals(medicationId) & tbl.isDeleted.equals(false))
+          ..orderBy([(tbl) => OrderingTerm(expression: tbl.scheduledTime, mode: OrderingMode.asc)]))
+        .get();
   }
 
   /// Updates status of a dose log ('taken', 'pending', 'skipped') and records CDC event.
@@ -336,7 +353,7 @@ class AppDatabase extends _$AppDatabase {
           .go();
 
       // 3. Regenerate pending doses with updated times
-      final daysToGenerate = (durationWeeks * 7).clamp(1, 14);
+      final daysToGenerate = (durationWeeks * 7).clamp(1, 365);
       for (int dayOffset = 0; dayOffset < daysToGenerate; dayOffset++) {
         final date = now.add(Duration(days: dayOffset));
         for (final timeStr in timesOfDay) {

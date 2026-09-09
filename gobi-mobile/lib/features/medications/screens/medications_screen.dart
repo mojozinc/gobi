@@ -1,10 +1,13 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../core/services/api_service.dart';
+import '../../../data/local/test_data_hydrator.dart';
 import '../../../data/repositories/medications_repository.dart';
+import '../widgets/adaptive_dose_history_chart.dart';
 import '../widgets/review_schedule_bottom_sheet.dart';
 import '../widgets/voice_log_modal.dart';
 
@@ -34,6 +37,7 @@ class _MedicationsScreenState extends ConsumerState<MedicationsScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      TestDataHydrator.seedIfEmpty(_getRepository().db);
       _syncCloudData();
     });
   }
@@ -793,11 +797,26 @@ class _MedicationsScreenState extends ConsumerState<MedicationsScreen> {
                 const Icon(Icons.medical_services_outlined, size: 40, color: Colors.grey),
                 const SizedBox(height: 8),
                 const Text('No medications configured yet.'),
-                const SizedBox(height: 8),
+                const SizedBox(height: 12),
                 ElevatedButton(
                   onPressed: _openAddSchedule,
                   child: const Text('Add Your First Medication'),
                 ),
+                if (kDebugMode) ...[
+                  const SizedBox(height: 10),
+                  OutlinedButton.icon(
+                    icon: const Icon(Icons.science_outlined, size: 16),
+                    label: const Text('Load Sample Datasets (Debug)'),
+                    onPressed: () async {
+                      await _getRepository().seedSampleData(clearExisting: false);
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Loaded 3 sample datasets (Amoxicillin, Prednisone, Metformin)')),
+                        );
+                      }
+                    },
+                  ),
+                ],
               ],
             ),
           ),
@@ -812,10 +831,11 @@ class _MedicationsScreenState extends ConsumerState<MedicationsScreen> {
         final freq = med['frequency'] ?? '';
         final times = med['times'] ?? '';
         final instructions = med['instructions'] as String?;
+        final medId = med['id']?.toString() ?? '';
 
         return Card(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          margin: const EdgeInsets.only(bottom: 10),
+          margin: const EdgeInsets.only(bottom: 12),
           child: InkWell(
             borderRadius: BorderRadius.circular(12),
             onTap: () => _showMedicationActionSheet(med),
@@ -872,6 +892,13 @@ class _MedicationsScreenState extends ConsumerState<MedicationsScreen> {
                       ],
                     ),
                   ],
+
+                  // ── Adaptive Dose History Chart (Tier 1 / Tier 2 / Tier 3) ──
+                  if (medId.isNotEmpty)
+                    AdaptiveDoseHistoryChart(
+                      medicationId: medId,
+                      repository: _getRepository(),
+                    ),
                 ],
               ),
             ),
