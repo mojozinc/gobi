@@ -2,17 +2,20 @@ import 'package:flutter/material.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/services/api_service.dart';
 import '../../../core/services/voice_service.dart';
+import '../../../data/repositories/medications_repository.dart';
 import 'review_schedule_bottom_sheet.dart';
 
 class VoiceLogModal extends StatefulWidget {
-  final ApiService apiService;
+  final ApiService? apiService;
+  final MedicationsRepository? repository;
   final int? dependentId;
   final VoidCallback? onScheduleCreated;
   final Function(String message, {VoidCallback? onUndo})? onDoseLogged;
 
   const VoiceLogModal({
     super.key,
-    required this.apiService,
+    this.apiService,
+    this.repository,
     this.dependentId,
     this.onScheduleCreated,
     this.onDoseLogged,
@@ -20,7 +23,8 @@ class VoiceLogModal extends StatefulWidget {
 
   static Future<void> show({
     required BuildContext context,
-    required ApiService apiService,
+    ApiService? apiService,
+    MedicationsRepository? repository,
     int? dependentId,
     VoidCallback? onScheduleCreated,
     Function(String message, {VoidCallback? onUndo})? onDoseLogged,
@@ -35,6 +39,7 @@ class VoiceLogModal extends StatefulWidget {
         ),
         child: VoiceLogModal(
           apiService: apiService,
+          repository: repository,
           dependentId: dependentId,
           onScheduleCreated: onScheduleCreated,
           onDoseLogged: onDoseLogged,
@@ -42,6 +47,7 @@ class VoiceLogModal extends StatefulWidget {
       ),
     );
   }
+
 
   @override
   State<VoiceLogModal> createState() => _VoiceLogModalState();
@@ -133,7 +139,8 @@ class _VoiceLogModalState extends State<VoiceLogModal> {
     });
 
     try {
-      final res = await widget.apiService.parseVoiceIntent(
+      final apiService = widget.apiService ?? widget.repository?.apiService ?? ApiService();
+      final res = await apiService.parseVoiceIntent(
         text,
         dependentId: widget.dependentId,
       );
@@ -161,6 +168,7 @@ class _VoiceLogModalState extends State<VoiceLogModal> {
         ReviewScheduleBottomSheet.show(
           context: context,
           apiService: widget.apiService,
+          repository: widget.repository,
           initialName: scheduleData['name'] as String?,
           initialDosage: scheduleData['dosage'] as String?,
           initialFrequency: scheduleData['frequency'] as String?,
@@ -181,7 +189,10 @@ class _VoiceLogModalState extends State<VoiceLogModal> {
 
         // Query today's doses to find matching pending dose
         try {
-          final todayDoses = await widget.apiService.getTodayDoses(dependentId: widget.dependentId);
+          final List<dynamic> todayDoses = widget.repository != null
+              ? await widget.repository!.getTodayDoses(dependentId: widget.dependentId?.toString())
+              : await apiService.getTodayDoses(dependentId: widget.dependentId);
+
           final matchingDose = todayDoses.firstWhere(
             (d) {
               final dName = (d['medication_name'] as String? ?? '').toLowerCase();
@@ -191,13 +202,23 @@ class _VoiceLogModalState extends State<VoiceLogModal> {
           );
 
           if (matchingDose != null) {
-            final doseId = matchingDose['id'] as int;
-            await widget.apiService.takeDose(doseId);
+            final doseId = matchingDose['id'];
+            if (widget.repository != null) {
+              await widget.repository!.takeDose(doseId);
+            } else {
+              final intId = int.tryParse(doseId.toString()) ?? 0;
+              await apiService.takeDose(intId);
+            }
 
             widget.onDoseLogged?.call(
               'Logged dose for $medName as $doseStatus',
               onUndo: () async {
-                await widget.apiService.undoDose(doseId);
+                if (widget.repository != null) {
+                  await widget.repository!.undoDose(doseId);
+                } else {
+                  final intId = int.tryParse(doseId.toString()) ?? 0;
+                  await apiService.undoDose(intId);
+                }
                 widget.onScheduleCreated?.call();
               },
             );
@@ -218,6 +239,7 @@ class _VoiceLogModalState extends State<VoiceLogModal> {
           _isAnalyzing = false;
         });
       }
+
     } catch (e) {
       if (mounted) {
         setState(() {

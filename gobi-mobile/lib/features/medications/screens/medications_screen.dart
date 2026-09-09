@@ -1,83 +1,97 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/providers/app_providers.dart';
 import '../../../core/services/api_service.dart';
+import '../../../data/repositories/medications_repository.dart';
 import '../widgets/review_schedule_bottom_sheet.dart';
 import '../widgets/voice_log_modal.dart';
 
-class MedicationsScreen extends StatefulWidget {
+class MedicationsScreen extends ConsumerStatefulWidget {
   final ApiService? apiService;
+  final MedicationsRepository? repository;
   final int? dependentId;
 
   const MedicationsScreen({
     super.key,
     this.apiService,
+    this.repository,
     this.dependentId,
   });
 
   @override
-  State<MedicationsScreen> createState() => _MedicationsScreenState();
+  ConsumerState<MedicationsScreen> createState() => _MedicationsScreenState();
 }
 
-class _MedicationsScreenState extends State<MedicationsScreen> {
-  late final ApiService _apiService;
+class _MedicationsScreenState extends ConsumerState<MedicationsScreen> {
   final ImagePicker _imagePicker = ImagePicker();
-
-  List<dynamic> _todayDoses = [];
-  List<dynamic> _medications = [];
-  bool _isLoading = true;
-  String? _error;
+  SyncStatus _syncStatus = SyncStatus.idle;
+  Stream<List<Map<String, dynamic>>>? _todayDosesStream;
+  Stream<List<Map<String, dynamic>>>? _medicationsStream;
 
   @override
   void initState() {
     super.initState();
-    _apiService = widget.apiService ?? ApiService();
-    _loadData();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _syncCloudData();
+    });
   }
 
-  Future<void> _loadData() async {
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _initStreams();
+  }
+
+  @override
+  void didUpdateWidget(MedicationsScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.dependentId != widget.dependentId || oldWidget.repository != widget.repository) {
+      _initStreams();
+    }
+  }
+
+  void _initStreams() {
+    final repo = _getRepository();
+    final depIdStr = widget.dependentId?.toString();
+    _todayDosesStream = repo.watchTodayDoses(dependentId: depIdStr);
+    _medicationsStream = repo.watchMedications(dependentId: depIdStr);
+  }
+
+  MedicationsRepository _getRepository() {
+    return widget.repository ?? ref.read(medicationsRepositoryProvider);
+  }
+
+  ApiService _getApiService() {
+    return widget.apiService ?? _getRepository().apiService;
+  }
+
+  Future<void> _syncCloudData() async {
+    if (!mounted) return;
     setState(() {
-      _isLoading = true;
-      _error = null;
+      _syncStatus = SyncStatus.syncing;
     });
 
-    try {
-      final results = await Future.wait([
-        _apiService.getTodayDoses(dependentId: widget.dependentId),
-        _apiService.getMedications(dependentId: widget.dependentId),
-      ]);
+    final repo = _getRepository();
+    final success = await repo.syncWithCloud(
+      dependentId: widget.dependentId?.toString(),
+    );
 
-      if (mounted) {
-        setState(() {
-          _todayDoses = results[0];
-          _medications = results[1];
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _error = e.toString();
-          _isLoading = false;
-        });
-      }
+    if (mounted) {
+      setState(() {
+        _syncStatus = success ? SyncStatus.synced : SyncStatus.offline;
+      });
     }
   }
 
   Future<void> _takeDose(Map<String, dynamic> dose) async {
-    final doseId = dose['id'] as int;
+    final doseId = dose['id'];
     final medName = dose['medication_name'] ?? 'Medication';
-
-    // Optimistic UI update
-    setState(() {
-      final idx = _todayDoses.indexWhere((d) => d['id'] == doseId);
-      if (idx != -1) {
-        _todayDoses[idx] = Map<String, dynamic>.from(_todayDoses[idx])..['status'] = 'taken';
-      }
-    });
+    final repo = _getRepository();
 
     try {
-      await _apiService.takeDose(doseId);
+      await repo.takeDose(doseId);
 
       if (mounted) {
         ScaffoldMessenger.of(context).clearSnackBars();
@@ -95,7 +109,6 @@ class _MedicationsScreenState extends State<MedicationsScreen> {
         );
       }
     } catch (e) {
-      _loadData(); // Revert on error
       if (mounted) {
         ScaffoldMessenger.of(context).clearSnackBars();
         ScaffoldMessenger.of(context).showSnackBar(
@@ -110,17 +123,11 @@ class _MedicationsScreenState extends State<MedicationsScreen> {
     }
   }
 
-  Future<void> _undoDose(int doseId, String medName) async {
-    // Optimistic UI update
-    setState(() {
-      final idx = _todayDoses.indexWhere((d) => d['id'] == doseId);
-      if (idx != -1) {
-        _todayDoses[idx] = Map<String, dynamic>.from(_todayDoses[idx])..['status'] = 'pending';
-      }
-    });
+  Future<void> _undoDose(dynamic doseId, String medName) async {
+    final repo = _getRepository();
 
     try {
-      await _apiService.undoDose(doseId);
+      await repo.undoDose(doseId);
       if (mounted) {
         ScaffoldMessenger.of(context).clearSnackBars();
         ScaffoldMessenger.of(context).showSnackBar(
@@ -133,7 +140,6 @@ class _MedicationsScreenState extends State<MedicationsScreen> {
         );
       }
     } catch (e) {
-      _loadData();
       if (mounted) {
         ScaffoldMessenger.of(context).clearSnackBars();
         ScaffoldMessenger.of(context).showSnackBar(
@@ -199,7 +205,8 @@ class _MedicationsScreenState extends State<MedicationsScreen> {
     );
 
     try {
-      final ocrResult = await _apiService.scanPrescription(
+      final apiService = _getApiService();
+      final ocrResult = await apiService.scanPrescription(
         picked.path,
         dependentId: widget.dependentId,
       );
@@ -215,14 +222,14 @@ class _MedicationsScreenState extends State<MedicationsScreen> {
         return;
       }
 
-      // Open review bottom sheet for first/each medication found
       final first = meds.first as Map<String, dynamic>;
       final timesDynamic = first['times'] as List<dynamic>?;
       final times = timesDynamic?.map((e) => e.toString()).toList();
 
       ReviewScheduleBottomSheet.show(
         context: context,
-        apiService: _apiService,
+        apiService: apiService,
+        repository: _getRepository(),
         initialName: first['name'] as String?,
         initialDosage: first['dosage'] as String?,
         initialFrequency: first['frequency'] as String?,
@@ -230,7 +237,6 @@ class _MedicationsScreenState extends State<MedicationsScreen> {
         initialDurationWeeks: first['duration_weeks'] as int?,
         initialInstructions: first['instructions'] as String?,
         dependentId: widget.dependentId,
-        onSaved: _loadData,
       );
     } catch (e) {
       if (mounted) {
@@ -248,12 +254,11 @@ class _MedicationsScreenState extends State<MedicationsScreen> {
   void _openVoiceModal() {
     VoiceLogModal.show(
       context: context,
-      apiService: _apiService,
+      apiService: _getApiService(),
+      repository: _getRepository(),
       dependentId: widget.dependentId,
-      onScheduleCreated: _loadData,
       onDoseLogged: (msg, {onUndo}) {
         if (!mounted) return;
-        _loadData();
         ScaffoldMessenger.of(context).clearSnackBars();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -265,7 +270,6 @@ class _MedicationsScreenState extends State<MedicationsScreen> {
                     textColor: AppColors.warning,
                     onPressed: () {
                       onUndo();
-                      if (mounted) _loadData();
                     },
                   )
                 : null,
@@ -278,26 +282,53 @@ class _MedicationsScreenState extends State<MedicationsScreen> {
   void _openAddSchedule() {
     ReviewScheduleBottomSheet.show(
       context: context,
-      apiService: _apiService,
+      apiService: _getApiService(),
+      repository: _getRepository(),
       dependentId: widget.dependentId,
-      onSaved: _loadData,
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    final repo = _getRepository();
+    final depIdStr = widget.dependentId?.toString();
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Medications & Adherence'),
         actions: [
+          // Cloud Sync Status Badge
+          IconButton(
+            tooltip: _syncStatus == SyncStatus.synced
+                ? 'Cloud Synced'
+                : _syncStatus == SyncStatus.syncing
+                    ? 'Syncing with Cloud...'
+                    : 'Offline Mode (Local Storage)',
+            icon: _syncStatus == SyncStatus.syncing
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                  )
+                : Icon(
+                    _syncStatus == SyncStatus.synced
+                        ? Icons.cloud_done
+                        : Icons.cloud_off_outlined,
+                    color: _syncStatus == SyncStatus.synced
+                        ? AppColors.success
+                        : Colors.white70,
+                    size: 22,
+                  ),
+            onPressed: _syncCloudData,
+          ),
           IconButton(
             icon: const Icon(Icons.refresh),
-            onPressed: _loadData,
+            onPressed: _syncCloudData,
           ),
         ],
       ),
       body: RefreshIndicator(
-        onRefresh: _loadData,
+        onRefresh: _syncCloudData,
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.all(16),
@@ -308,49 +339,74 @@ class _MedicationsScreenState extends State<MedicationsScreen> {
               _buildAiActionsBar(),
               const SizedBox(height: 24),
 
-              // Today's Doses Section
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    "Today's Schedule",
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                  ),
-                  Text(
-                    '${_todayDoses.where((d) => d['status'] == 'taken').length}/${_todayDoses.length} Taken',
-                    style: TextStyle(
-                      color: AppColors.primary,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
+              // Today's Doses Section (Reactive Stream from Local SQLite)
+              StreamBuilder<List<Map<String, dynamic>>>(
+                stream: _todayDosesStream ?? repo.watchTodayDoses(dependentId: depIdStr),
+                builder: (context, snapshot) {
+                  final todayDoses = snapshot.data ?? [];
+                  final takenCount = todayDoses.where((d) => d['status'] == 'taken').length;
+
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            "Today's Schedule",
+                            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                          ),
+                          Text(
+                            '$takenCount/${todayDoses.length} Taken',
+                            style: TextStyle(
+                              color: AppColors.primary,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      _buildTodayDosesList(todayDoses, snapshot.connectionState == ConnectionState.waiting),
+                    ],
+                  );
+                },
               ),
-              const SizedBox(height: 12),
-              _buildTodayDosesList(),
 
               const SizedBox(height: 28),
 
-              // All Medications Section
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Active Medications',
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                  ),
-                  TextButton.icon(
-                    onPressed: _openAddSchedule,
-                    icon: const Icon(Icons.add, size: 18),
-                    label: const Text('Add'),
-                  ),
-                ],
+              // All Medications Section (Reactive Stream from Local SQLite)
+              StreamBuilder<List<Map<String, dynamic>>>(
+                stream: _medicationsStream ?? repo.watchMedications(dependentId: depIdStr),
+                builder: (context, snapshot) {
+                  final medications = snapshot.data ?? [];
+
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Active Medications',
+                            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                          ),
+                          TextButton.icon(
+                            onPressed: _openAddSchedule,
+                            icon: const Icon(Icons.add, size: 18),
+                            label: const Text('Add'),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      _buildMedicationsList(medications, snapshot.connectionState == ConnectionState.waiting),
+                    ],
+                  );
+                },
               ),
-              const SizedBox(height: 12),
-              _buildMedicationsList(),
               SizedBox(height: MediaQuery.of(context).padding.bottom + 64),
             ],
           ),
@@ -434,8 +490,8 @@ class _MedicationsScreenState extends State<MedicationsScreen> {
     );
   }
 
-  Widget _buildTodayDosesList() {
-    if (_isLoading) {
+  Widget _buildTodayDosesList(List<Map<String, dynamic>> todayDoses, bool isInitialLoading) {
+    if (isInitialLoading && todayDoses.isEmpty) {
       return const Center(
         child: Padding(
           padding: EdgeInsets.all(24.0),
@@ -444,16 +500,7 @@ class _MedicationsScreenState extends State<MedicationsScreen> {
       );
     }
 
-    if (_error != null && _todayDoses.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Text('Error: $_error', style: const TextStyle(color: AppColors.error)),
-        ),
-      );
-    }
-
-    if (_todayDoses.isEmpty) {
+    if (todayDoses.isEmpty) {
       return Card(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         child: const Padding(
@@ -472,7 +519,7 @@ class _MedicationsScreenState extends State<MedicationsScreen> {
     }
 
     return Column(
-      children: _todayDoses.map((dose) {
+      children: todayDoses.map((dose) {
         final isTaken = dose['status'] == 'taken';
         final medName = dose['medication_name'] ?? 'Medication';
         final dosage = dose['dosage'] ?? '';
@@ -538,8 +585,8 @@ class _MedicationsScreenState extends State<MedicationsScreen> {
     );
   }
 
-  Widget _buildMedicationsList() {
-    if (_medications.isEmpty && !_isLoading) {
+  Widget _buildMedicationsList(List<Map<String, dynamic>> medications, bool isInitialLoading) {
+    if (medications.isEmpty && !isInitialLoading) {
       return Card(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         child: Padding(
@@ -563,7 +610,7 @@ class _MedicationsScreenState extends State<MedicationsScreen> {
     }
 
     return Column(
-      children: _medications.map((med) {
+      children: medications.map((med) {
         final name = med['name'] ?? '';
         final dosage = med['dosage'] ?? '';
         final freq = med['frequency'] ?? '';
