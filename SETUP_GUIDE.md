@@ -160,6 +160,33 @@ cd gobi-mobile
 # Press 'R' in terminal running flutter
 ```
 
+#### Code Generation (Drift SQLite & Hive)
+When you modify database tables in `lib/data/local/app_database.dart` or `tables.dart`:
+
+```bash
+# Regenerate Drift ORM code (app_database.g.dart)
+cd gobi-mobile
+dart run build_runner build --delete-conflicting-outputs
+
+# Or from project root:
+make codegen
+
+# Live watcher mode during active development:
+make watch-codegen
+```
+
+#### Makefile Shortcuts
+From the root repository directory:
+```bash
+make up             # Launch backend services
+make down           # Stop backend services
+make run            # Launch mobile app
+make codegen        # Run code generation for Drift & Hive
+make watch-codegen  # Watch table changes and auto-regenerate
+make test           # Run all Flutter unit & widget tests
+make clean          # Clean mobile build artifacts
+```
+
 ## 🔧 Detailed Setup
 
 ### Backend API - Manual Setup (without Docker)

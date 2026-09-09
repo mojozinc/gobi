@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/services/api_service.dart';
+import '../../../data/repositories/medications_repository.dart';
 
 class ReviewScheduleBottomSheet extends StatefulWidget {
-  final ApiService apiService;
+  final ApiService? apiService;
+  final MedicationsRepository? repository;
   final String? initialName;
   final String? initialDosage;
   final String? initialFrequency;
@@ -15,7 +17,8 @@ class ReviewScheduleBottomSheet extends StatefulWidget {
 
   const ReviewScheduleBottomSheet({
     super.key,
-    required this.apiService,
+    this.apiService,
+    this.repository,
     this.initialName,
     this.initialDosage,
     this.initialFrequency,
@@ -28,7 +31,8 @@ class ReviewScheduleBottomSheet extends StatefulWidget {
 
   static Future<void> show({
     required BuildContext context,
-    required ApiService apiService,
+    ApiService? apiService,
+    MedicationsRepository? repository,
     String? initialName,
     String? initialDosage,
     String? initialFrequency,
@@ -48,6 +52,7 @@ class ReviewScheduleBottomSheet extends StatefulWidget {
         ),
         child: ReviewScheduleBottomSheet(
           apiService: apiService,
+          repository: repository,
           initialName: initialName,
           initialDosage: initialDosage,
           initialFrequency: initialFrequency,
@@ -60,6 +65,7 @@ class ReviewScheduleBottomSheet extends StatefulWidget {
       ),
     );
   }
+
 
   @override
   State<ReviewScheduleBottomSheet> createState() => _ReviewScheduleBottomSheetState();
@@ -149,7 +155,12 @@ class _ReviewScheduleBottomSheetState extends State<ReviewScheduleBottomSheet> {
         if (widget.dependentId != null) 'dependent_id': widget.dependentId,
       };
 
-      await widget.apiService.createMedication(payload);
+      if (widget.repository != null) {
+        await widget.repository!.addMedication(payload);
+      } else if (widget.apiService != null) {
+        await widget.apiService!.createMedication(payload);
+      }
+
 
       if (mounted) {
         Navigator.of(context).pop();

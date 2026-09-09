@@ -207,6 +207,20 @@ flutter run
 flutter run --dart-define=API_BASE_URL=http://192.168.0.109:8000
 ```
 
+### 🛠️ Developer Shortcuts (`Makefile`)
+
+From the root directory, you can run common tasks via `make`:
+
+```bash
+make up             # Start backend PostgreSQL + FastAPI in Docker
+make down           # Stop backend services
+make run            # Launch Flutter mobile app with resolved host IP
+make codegen        # Regenerate Drift SQLite (app_database.g.dart) & Hive models
+make watch-codegen  # Live auto-regeneration during schema development
+make test           # Run all mobile unit and widget tests
+make clean          # Clean mobile build artifacts and re-install packages
+```
+
 **See [SETUP_GUIDE.md](SETUP_GUIDE.md) for detailed instructions.**
 
 ---

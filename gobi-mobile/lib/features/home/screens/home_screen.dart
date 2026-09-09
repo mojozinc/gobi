@@ -22,15 +22,20 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final apiService = ref.watch(apiServiceProvider);
+    final medicationsRepository = ref.watch(medicationsRepositoryProvider);
 
     final List<Widget> screens = [
       const DashboardScreen(),
-      MedicationsScreen(apiService: apiService),
+      MedicationsScreen(
+        apiService: apiService,
+        repository: medicationsRepository,
+      ),
       HealthChatScreen(apiService: apiService),
       const DocumentsScreen(),
       const FamilyScreen(),
       const SettingsScreen(),
     ];
+
 
     return Scaffold(
       body: screens[_currentIndex],

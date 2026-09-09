@@ -225,9 +225,17 @@ flutter logs
 ```
 
 ### Code Generation
-If you add/modify Hive models:
+The app uses code generation for **Drift SQLite** (`app_database.g.dart`) and **Hive** models. When modifying database tables or data classes, regenerate code with:
+
 ```bash
-flutter pub run build_runner build --delete-conflicting-outputs
+# From gobi-mobile/ directory:
+dart run build_runner build --delete-conflicting-outputs
+
+# Or from project root:
+make codegen
+
+# Live watcher during active schema development:
+make watch-codegen
 ```
 
 ## Testing

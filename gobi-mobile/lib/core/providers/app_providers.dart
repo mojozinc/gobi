@@ -1,13 +1,22 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../data/api/api_client.dart';
+import '../../data/local/app_database.dart';
 import '../../data/repositories/auth_repository.dart';
+import '../../data/repositories/medications_repository.dart';
 import '../../data/models/user.dart';
 import '../services/api_service.dart';
 
 // Shared Preferences Provider
 final sharedPreferencesProvider = Provider<SharedPreferences?>((ref) {
   return null;
+});
+
+// App SQLite Database Provider
+final appDatabaseProvider = Provider<AppDatabase>((ref) {
+  final db = AppDatabase();
+  ref.onDispose(() => db.close());
+  return db;
 });
 
 // API Client Provider
@@ -19,6 +28,32 @@ final apiClientProvider = Provider<ApiClient>((ref) {
 final apiServiceProvider = Provider<ApiService>((ref) {
   final prefs = ref.watch(sharedPreferencesProvider);
   return ApiService(prefs: prefs);
+});
+
+// Medications Repository Provider (Local First + Cloud Sync)
+final medicationsRepositoryProvider = Provider<MedicationsRepository>((ref) {
+  final db = ref.watch(appDatabaseProvider);
+  final apiService = ref.watch(apiServiceProvider);
+  return MedicationsRepository(db, apiService);
+});
+
+// Stream of Active Medications from Local Database
+final medicationsListStreamProvider =
+    StreamProvider.autoDispose.family<List<Map<String, dynamic>>, String?>((ref, dependentId) {
+  final repo = ref.watch(medicationsRepositoryProvider);
+  return repo.watchMedications(dependentId: dependentId);
+});
+
+// Stream of Today's Doses from Local Database
+final todayDosesStreamProvider =
+    StreamProvider.autoDispose.family<List<Map<String, dynamic>>, String?>((ref, dependentId) {
+  final repo = ref.watch(medicationsRepositoryProvider);
+  return repo.watchTodayDoses(dependentId: dependentId);
+});
+
+// Cloud Sync Status Provider
+final syncStatusProvider = StateProvider<SyncStatus>((ref) {
+  return SyncStatus.idle;
 });
 
 // Auth Repository Provider
@@ -39,6 +74,7 @@ final authStateProvider = StateNotifierProvider<AuthStateNotifier, AuthState>((r
 final themeModeProvider = StateProvider<bool>((ref) {
   return false; // false = light mode, true = dark mode
 });
+
 
 // Auth State
 class AuthState {
