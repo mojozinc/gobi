@@ -34,3 +34,7 @@ down:
 ip:
 	@echo $(API_URL)
 
+# AI Chat API Smoke Test
+smoke-chat:
+	@./scripts/smoke_test_chat.sh
+

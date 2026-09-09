@@ -5,6 +5,7 @@ import '../../data/local/app_database.dart';
 import '../../data/repositories/auth_repository.dart';
 import '../../data/repositories/medications_repository.dart';
 import '../../data/models/user.dart';
+import '../config/app_config.dart';
 import '../services/api_service.dart';
 
 // Shared Preferences Provider
@@ -24,10 +25,13 @@ final apiClientProvider = Provider<ApiClient>((ref) {
   return ApiClient();
 });
 
-// New FastAPI Service Provider
+// FastAPI Service Provider
 final apiServiceProvider = Provider<ApiService>((ref) {
   final prefs = ref.watch(sharedPreferencesProvider);
-  return ApiService(prefs: prefs);
+  return ApiService(
+    baseUrl: AppConfig.apiBaseUrl,
+    prefs: prefs,
+  );
 });
 
 // Medications Repository Provider (Local First + Cloud Sync)
@@ -73,6 +77,63 @@ final authStateProvider = StateNotifierProvider<AuthStateNotifier, AuthState>((r
 // Theme Mode Provider
 final themeModeProvider = StateProvider<bool>((ref) {
   return false; // false = light mode, true = dark mode
+});
+
+// Chat Message Model
+class ChatMessage {
+  final String text;
+  final bool isUser;
+  final DateTime timestamp;
+  final bool isError;
+  final String? failedQuery;
+
+  ChatMessage({
+    required this.text,
+    required this.isUser,
+    DateTime? timestamp,
+    this.isError = false,
+    this.failedQuery,
+  }) : timestamp = timestamp ?? DateTime.now();
+
+  Map<String, String> toApiMap() => {
+        'role': isUser ? 'user' : 'assistant',
+        'content': text,
+      };
+}
+
+// Chat Messages State Notifier for in-memory session persistence
+class ChatMessagesNotifier extends StateNotifier<List<ChatMessage>> {
+  ChatMessagesNotifier() : super([]) {
+    reset();
+  }
+
+  void reset() {
+    state = [
+      ChatMessage(
+        text:
+            'Hello! I am your Gobi Health Assistant powered by OpenRouter AI. Ask me anything about your medications, dose history, and prescriptions.',
+        isUser: false,
+      ),
+    ];
+  }
+
+  void addMessage(ChatMessage message) {
+    state = [...state, message];
+  }
+
+  void removeLastIfError() {
+    if (state.isNotEmpty && state.last.isError) {
+      state = state.sublist(0, state.length - 1);
+    }
+  }
+
+  void removeMessage(ChatMessage message) {
+    state = state.where((m) => m != message).toList();
+  }
+}
+
+final chatMessagesProvider = StateNotifierProvider<ChatMessagesNotifier, List<ChatMessage>>((ref) {
+  return ChatMessagesNotifier();
 });
 
 

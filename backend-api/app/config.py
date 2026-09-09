@@ -7,6 +7,7 @@ class Settings(BaseSettings):
     VERSION: str = "0.1.0"
     ENV: str = "development"
     PORT: int = 8000
+    LOG_LEVEL: str = "DEBUG"
     
     # Database
     DATABASE_URL: str = "postgresql+asyncpg://gobi:gobi_password@localhost:5432/gobi_db"
@@ -22,8 +23,8 @@ class Settings(BaseSettings):
     # OpenRouter
     OPENROUTER_API_KEY: str = ""
     OPENROUTER_BASE_URL: str = "https://openrouter.ai/api/v1"
-    OPENROUTER_TEXT_MODEL: str = "meta-llama/llama-3.3-70b-instruct:free"
-    OPENROUTER_VISION_MODEL: str = "google/gemini-2.0-flash-exp:free"
+    OPENROUTER_TEXT_MODEL: str = "meta-llama/llama-3.3-70b-instruct"
+    OPENROUTER_VISION_MODEL: str = "google/gemini-3.8-flash"
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 

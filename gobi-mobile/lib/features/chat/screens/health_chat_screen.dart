@@ -1,26 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/providers/app_providers.dart';
 import '../../../core/services/api_service.dart';
 import '../../../core/services/voice_service.dart';
 
-class ChatMessage {
-  final String text;
-  final bool isUser;
-  final DateTime timestamp;
-
-  ChatMessage({
-    required this.text,
-    required this.isUser,
-    DateTime? timestamp,
-  }) : timestamp = timestamp ?? DateTime.now();
-
-  Map<String, String> toApiMap() => {
-        'role': isUser ? 'user' : 'assistant',
-        'content': text,
-      };
-}
-
-class HealthChatScreen extends StatefulWidget {
+class HealthChatScreen extends ConsumerStatefulWidget {
   final ApiService apiService;
   final int? dependentId;
 
@@ -31,11 +17,10 @@ class HealthChatScreen extends StatefulWidget {
   });
 
   @override
-  State<HealthChatScreen> createState() => _HealthChatScreenState();
+  ConsumerState<HealthChatScreen> createState() => _HealthChatScreenState();
 }
 
-class _HealthChatScreenState extends State<HealthChatScreen> {
-  final List<ChatMessage> _messages = [];
+class _HealthChatScreenState extends ConsumerState<HealthChatScreen> {
   final TextEditingController _textController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final VoiceService _voiceService = VoiceService();
@@ -48,18 +33,6 @@ class _HealthChatScreenState extends State<HealthChatScreen> {
     'Summarize my prescription schedule',
     'Any instructions for my meds?',
   ];
-
-  @override
-  void initState() {
-    super.initState();
-    // Initial welcome message
-    _messages.add(
-      ChatMessage(
-        text: 'Hello! I am your Gobi Health Assistant powered by OpenRouter AI. Ask me anything about your medications, dose history, and prescriptions.',
-        isUser: false,
-      ),
-    );
-  }
 
   @override
   void dispose() {
@@ -79,6 +52,17 @@ class _HealthChatScreenState extends State<HealthChatScreen> {
         );
       }
     });
+  }
+
+  void _clearChat() {
+    ref.read(chatMessagesProvider.notifier).reset();
+    ScaffoldMessenger.of(context).clearSnackBars();
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Chat conversation reset.'),
+        duration: Duration(seconds: 2),
+      ),
+    );
   }
 
   void _toggleMic() async {
@@ -126,7 +110,34 @@ class _HealthChatScreenState extends State<HealthChatScreen> {
     }
   }
 
-  Future<void> _sendMessage([String? promptText]) async {
+  void _onTapUserMessage(String query) {
+    // If last message was an error for this query, retry immediately
+    final messages = ref.read(chatMessagesProvider);
+    if (messages.isNotEmpty && messages.last.isError && messages.last.failedQuery == query) {
+      _sendMessage(query, true);
+      return;
+    }
+    // Otherwise populate the input field for easy editing
+    setState(() {
+      _textController.text = query;
+      _textController.selection = TextSelection.fromPosition(
+        TextPosition(offset: _textController.text.length),
+      );
+    });
+    ScaffoldMessenger.of(context).clearSnackBars();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Loaded "$query" into input field.'),
+        duration: const Duration(seconds: 2),
+        action: SnackBarAction(
+          label: 'Send',
+          onPressed: () => _sendMessage(query),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _sendMessage([String? promptText, bool isRetry = false]) async {
     final text = promptText ?? _textController.text.trim();
     if (text.isEmpty || _isLoading) return;
 
@@ -137,16 +148,24 @@ class _HealthChatScreenState extends State<HealthChatScreen> {
       });
     }
 
-    _textController.clear();
+    if (isRetry) {
+      ref.read(chatMessagesProvider.notifier).removeLastIfError();
+    } else {
+      _textController.clear();
+      ref.read(chatMessagesProvider.notifier).addMessage(
+            ChatMessage(text: text, isUser: true),
+          );
+    }
+
     setState(() {
-      _messages.add(ChatMessage(text: text, isUser: true));
       _isLoading = true;
     });
     _scrollToBottom();
 
     try {
-      final history = _messages
-          .where((m) => m != _messages.first) // exclude initial greeting
+      final currentMessages = ref.read(chatMessagesProvider);
+      final history = currentMessages
+          .where((m) => m != currentMessages.first && !m.isError) // exclude initial greeting & errors
           .map((m) => m.toApiMap())
           .toList();
 
@@ -159,21 +178,25 @@ class _HealthChatScreenState extends State<HealthChatScreen> {
       final reply = res['response'] as String? ?? 'No response received.';
 
       if (mounted) {
+        ref.read(chatMessagesProvider.notifier).addMessage(
+              ChatMessage(text: reply, isUser: false),
+            );
         setState(() {
-          _messages.add(ChatMessage(text: reply, isUser: false));
           _isLoading = false;
         });
         _scrollToBottom();
       }
     } catch (e) {
       if (mounted) {
+        ref.read(chatMessagesProvider.notifier).addMessage(
+              ChatMessage(
+                text: 'Unable to reach health assistant: $e',
+                isUser: false,
+                isError: true,
+                failedQuery: text,
+              ),
+            );
         setState(() {
-          _messages.add(
-            ChatMessage(
-              text: '⚠️ Unable to reach health assistant: $e',
-              isUser: false,
-            ),
-          );
           _isLoading = false;
         });
         _scrollToBottom();
@@ -183,6 +206,8 @@ class _HealthChatScreenState extends State<HealthChatScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final messages = ref.watch(chatMessagesProvider);
+
     return Scaffold(
       appBar: AppBar(
         title: Row(
@@ -205,6 +230,13 @@ class _HealthChatScreenState extends State<HealthChatScreen> {
             ),
           ],
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            tooltip: 'New Chat / Clear',
+            onPressed: _clearChat,
+          ),
+        ],
       ),
       body: Column(
         children: [
@@ -213,10 +245,14 @@ class _HealthChatScreenState extends State<HealthChatScreen> {
             child: ListView.builder(
               controller: _scrollController,
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              itemCount: _messages.length,
+              itemCount: messages.length,
               itemBuilder: (context, index) {
-                final msg = _messages[index];
-                return _ChatBubble(message: msg);
+                final msg = messages[index];
+                return _ChatBubble(
+                  message: msg,
+                  onRetry: (query) => _sendMessage(query, true),
+                  onTapUserMessage: (query) => _onTapUserMessage(query),
+                );
               },
             ),
           ),
@@ -242,7 +278,7 @@ class _HealthChatScreenState extends State<HealthChatScreen> {
             ),
 
           // Quick Suggestion Chips (when only 1 or 2 messages)
-          if (_messages.length <= 2)
+          if (messages.length <= 2)
             Container(
               height: 40,
               margin: const EdgeInsets.only(bottom: 8),
@@ -328,12 +364,20 @@ class _HealthChatScreenState extends State<HealthChatScreen> {
 
 class _ChatBubble extends StatelessWidget {
   final ChatMessage message;
+  final void Function(String query)? onRetry;
+  final void Function(String query)? onTapUserMessage;
 
-  const _ChatBubble({required this.message});
+  const _ChatBubble({
+    required this.message,
+    this.onRetry,
+    this.onTapUserMessage,
+  });
 
   @override
   Widget build(BuildContext context) {
     final isUser = message.isUser;
+    final isError = message.isError;
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
@@ -345,43 +389,144 @@ class _ChatBubble extends StatelessWidget {
               margin: const EdgeInsets.only(right: 8, top: 2),
               padding: const EdgeInsets.all(6),
               decoration: BoxDecoration(
-                color: AppColors.primary.withOpacity(0.12),
+                color: isError
+                    ? AppColors.error.withOpacity(0.12)
+                    : AppColors.primary.withOpacity(0.12),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.auto_awesome, color: AppColors.primary, size: 16),
+              child: Icon(
+                isError ? Icons.error_outline : Icons.auto_awesome,
+                color: isError ? AppColors.error : AppColors.primary,
+                size: 16,
+              ),
             ),
           Flexible(
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              decoration: BoxDecoration(
-                color: isUser ? AppColors.primary : Colors.grey.shade100,
-                borderRadius: BorderRadius.only(
-                  topLeft: const Radius.circular(16),
-                  topRight: const Radius.circular(16),
-                  bottomLeft: Radius.circular(isUser ? 16 : 4),
-                  bottomRight: Radius.circular(isUser ? 4 : 16),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(16),
+              onTap: isError
+                  ? () => onRetry?.call(message.failedQuery ?? '')
+                  : isUser
+                      ? () => onTapUserMessage?.call(message.text)
+                      : null,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  color: isUser
+                      ? AppColors.primary
+                      : isError
+                          ? const Color(0xFFFFF2F0)
+                          : Colors.grey.shade100,
+                  borderRadius: BorderRadius.only(
+                    topLeft: const Radius.circular(16),
+                    topRight: const Radius.circular(16),
+                    bottomLeft: Radius.circular(isUser ? 16 : 4),
+                    bottomRight: Radius.circular(isUser ? 4 : 16),
+                  ),
+                  border: isError
+                      ? Border.all(color: const Color(0xFFFFCCC7), width: 1.2)
+                      : null,
                 ),
-              ),
-              child: Column(
-                crossAxisAlignment: isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    message.text,
-                    style: TextStyle(
-                      color: isUser ? Colors.white : Colors.black87,
-                      fontSize: 14,
-                      height: 1.35,
+                child: Column(
+                  crossAxisAlignment: isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                  children: [
+                    if (isUser)
+                      Text(
+                        message.text,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                          height: 1.35,
+                        ),
+                      )
+                    else if (isError) ...[
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.warning_amber_rounded, color: AppColors.error, size: 16),
+                          const SizedBox(width: 6),
+                          Text(
+                            'Delivery Failed',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.red.shade800,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        message.text,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.red.shade900,
+                          height: 1.35,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      // Retry action pill button
+                      Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap: () => onRetry?.call(message.failedQuery ?? ''),
+                          borderRadius: BorderRadius.circular(20),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: AppColors.error.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(color: AppColors.error.withOpacity(0.3)),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.refresh, size: 14, color: AppColors.error),
+                                SizedBox(width: 6),
+                                Text(
+                                  'Tap to retry',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: AppColors.error,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ] else
+                      MarkdownBody(
+                        data: message.text,
+                        styleSheet: MarkdownStyleSheet.fromTheme(Theme.of(context)).copyWith(
+                          p: const TextStyle(fontSize: 14, height: 1.45, color: Colors.black87),
+                          strong: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black87),
+                          listBullet: const TextStyle(color: AppColors.primary, fontSize: 14, fontWeight: FontWeight.bold),
+                          h1: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Colors.black87),
+                          h2: const TextStyle(fontSize: 15.5, fontWeight: FontWeight.bold, color: Colors.black87),
+                          h3: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w600, color: Colors.black87),
+                          code: TextStyle(backgroundColor: Colors.grey.shade200, fontSize: 12.5, fontFamily: 'monospace'),
+                          codeblockDecoration: BoxDecoration(
+                            color: Colors.grey.shade200,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          blockSpacing: 8.0,
+                        ),
+                      ),
+                    const SizedBox(height: 6),
+                    Text(
+                      '${message.timestamp.hour.toString().padLeft(2, '0')}:${message.timestamp.minute.toString().padLeft(2, '0')}',
+                      style: TextStyle(
+                        color: isUser
+                            ? Colors.white70
+                            : isError
+                                ? Colors.red.shade400
+                                : Colors.grey.shade500,
+                        fontSize: 10,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    '${message.timestamp.hour.toString().padLeft(2, '0')}:${message.timestamp.minute.toString().padLeft(2, '0')}',
-                    style: TextStyle(
-                      color: isUser ? Colors.white70 : Colors.grey.shade500,
-                      fontSize: 10,
-                    ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),

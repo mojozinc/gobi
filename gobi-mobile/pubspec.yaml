@@ -16,6 +16,7 @@ dependencies:
   # UI & Icons
   cupertino_icons: ^1.0.6
   google_fonts: ^6.1.0
+  flutter_markdown: ^0.7.4+3
 
   # Networking
   dio: ^5.4.0

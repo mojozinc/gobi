@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import '../config/app_config.dart';
 
 class ApiService {
   final String baseUrl;
@@ -11,10 +12,11 @@ class ApiService {
   Map<String, dynamic>? _user;
 
   ApiService({
-    this.baseUrl = 'http://127.0.0.1:8000/api/v1',
+    String? baseUrl,
     this.prefs,
     http.Client? client,
-  }) : _client = client ?? http.Client() {
+  })  : baseUrl = baseUrl ?? AppConfig.apiBaseUrl,
+        _client = client ?? http.Client() {
     _token = prefs?.getString('auth_token');
     final userStr = prefs?.getString('user_data');
     if (userStr != null) {
@@ -67,6 +69,60 @@ class ApiService {
     'Content-Type': 'application/json',
     if (token != null) 'Authorization': 'Bearer $token',
   };
+
+  /// Ensures an active authentication token exists, performing guest login if needed.
+  Future<void> ensureAuthenticated() async {
+    if (!isAuthenticated) {
+      try {
+        await loginAnonymously();
+      } catch (e) {
+        debugPrint('Auto-auth attempt notice: $e');
+      }
+    }
+  }
+
+  /// Internal helper to execute authenticated POST requests with automatic 401 recovery retry.
+  Future<http.Response> _postAuthenticated(Uri uri, Map<String, dynamic> body) async {
+    if (!isAuthenticated) {
+      await ensureAuthenticated();
+    }
+
+    var res = await _client.post(
+      uri,
+      headers: _headers,
+      body: jsonEncode(body),
+    );
+
+    // If 401 Unauthorized (expired or invalidated token), clear stale token, re-auth and retry once
+    if (res.statusCode == 401) {
+      clearAuth();
+      await ensureAuthenticated();
+      res = await _client.post(
+        uri,
+        headers: _headers,
+        body: jsonEncode(body),
+      );
+    }
+
+    return res;
+  }
+
+  /// Internal helper to execute authenticated GET requests with automatic 401 recovery retry.
+  Future<http.Response> _getAuthenticated(Uri uri) async {
+    if (!isAuthenticated) {
+      await ensureAuthenticated();
+    }
+
+    var res = await _client.get(uri, headers: _headers);
+
+    if (res.statusCode == 401) {
+      clearAuth();
+      await ensureAuthenticated();
+      res = await _client.get(uri, headers: _headers);
+    }
+
+    return res;
+  }
 
   // Auth
   Future<Map<String, dynamic>> loginAnonymously({String? deviceId, String? name}) async {
@@ -126,18 +182,25 @@ class ApiService {
 
   // AI Endpoints
   Future<Map<String, dynamic>> parseVoiceIntent(String text, {int? dependentId}) async {
-    final res = await _client.post(
+    final res = await _postAuthenticated(
       Uri.parse('$baseUrl/ai/parse-intent'),
-      headers: _headers,
-      body: jsonEncode({
+      {
         'text': text,
         if (dependentId != null) 'dependent_id': dependentId,
-      }),
+      },
     );
-    return jsonDecode(utf8.decode(res.bodyBytes));
+    final data = jsonDecode(utf8.decode(res.bodyBytes));
+    if (res.statusCode != 200) {
+      throw Exception(data['detail'] ?? 'Voice intent parsing failed');
+    }
+    return data;
   }
 
   Future<Map<String, dynamic>> scanPrescription(String filePath, {int? dependentId}) async {
+    if (!isAuthenticated) {
+      await ensureAuthenticated();
+    }
+
     final uri = Uri.parse('$baseUrl/ai/scan-prescription');
     final request = http.MultipartRequest('POST', uri);
     
@@ -151,20 +214,27 @@ class ApiService {
 
     final streamedResponse = await _client.send(request);
     final response = await http.Response.fromStream(streamedResponse);
-    return jsonDecode(utf8.decode(response.bodyBytes));
+    final data = jsonDecode(utf8.decode(response.bodyBytes));
+    if (response.statusCode != 200) {
+      throw Exception(data['detail'] ?? 'Prescription scan failed');
+    }
+    return data;
   }
 
   Future<Map<String, dynamic>> sendHealthChat(String query, {int? dependentId, List<Map<String, String>>? history}) async {
-    final res = await _client.post(
+    final res = await _postAuthenticated(
       Uri.parse('$baseUrl/ai/chat'),
-      headers: _headers,
-      body: jsonEncode({
+      {
         'query': query,
         if (dependentId != null) 'dependent_id': dependentId,
         'conversation_history': history ?? [],
-      }),
+      },
     );
-    return jsonDecode(utf8.decode(res.bodyBytes));
+    final data = jsonDecode(utf8.decode(res.bodyBytes));
+    if (res.statusCode != 200) {
+      throw Exception(data['detail'] ?? 'Chat request failed with status ${res.statusCode}');
+    }
+    return data;
   }
 
   // Medications
@@ -172,7 +242,7 @@ class ApiService {
     final url = dependentId != null 
         ? '$baseUrl/medications?dependent_id=$dependentId'
         : '$baseUrl/medications';
-    final res = await _client.get(Uri.parse(url), headers: _headers);
+    final res = await _getAuthenticated(Uri.parse(url));
     if (res.statusCode == 200) {
       return jsonDecode(utf8.decode(res.bodyBytes));
     }
@@ -180,19 +250,22 @@ class ApiService {
   }
 
   Future<Map<String, dynamic>> createMedication(Map<String, dynamic> data) async {
-    final res = await _client.post(
+    final res = await _postAuthenticated(
       Uri.parse('$baseUrl/medications'),
-      headers: _headers,
-      body: jsonEncode(data),
+      data,
     );
-    return jsonDecode(utf8.decode(res.bodyBytes));
+    final resData = jsonDecode(utf8.decode(res.bodyBytes));
+    if (res.statusCode != 200 && res.statusCode != 201) {
+      throw Exception(resData['detail'] ?? 'Create medication failed');
+    }
+    return resData;
   }
 
   Future<List<dynamic>> getTodayDoses({int? dependentId}) async {
     final url = dependentId != null
         ? '$baseUrl/medications/doses/today?dependent_id=$dependentId'
         : '$baseUrl/medications/doses/today';
-    final res = await _client.get(Uri.parse(url), headers: _headers);
+    final res = await _getAuthenticated(Uri.parse(url));
     if (res.statusCode == 200) {
       return jsonDecode(utf8.decode(res.bodyBytes));
     }
@@ -200,18 +273,26 @@ class ApiService {
   }
 
   Future<Map<String, dynamic>> takeDose(int doseId) async {
-    final res = await _client.post(
+    final res = await _postAuthenticated(
       Uri.parse('$baseUrl/medications/doses/$doseId/take'),
-      headers: _headers,
+      {},
     );
-    return jsonDecode(utf8.decode(res.bodyBytes));
+    final resData = jsonDecode(utf8.decode(res.bodyBytes));
+    if (res.statusCode != 200) {
+      throw Exception(resData['detail'] ?? 'Take dose failed');
+    }
+    return resData;
   }
 
   Future<Map<String, dynamic>> undoDose(int doseId) async {
-    final res = await _client.post(
+    final res = await _postAuthenticated(
       Uri.parse('$baseUrl/medications/doses/$doseId/undo'),
-      headers: _headers,
+      {},
     );
-    return jsonDecode(utf8.decode(res.bodyBytes));
+    final resData = jsonDecode(utf8.decode(res.bodyBytes));
+    if (res.statusCode != 200) {
+      throw Exception(resData['detail'] ?? 'Undo dose failed');
+    }
+    return resData;
   }
 }
