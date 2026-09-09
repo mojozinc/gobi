@@ -1,26 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/providers/app_providers.dart';
 import '../../../core/services/api_service.dart';
 import '../../../core/services/voice_service.dart';
 
-class ChatMessage {
-  final String text;
-  final bool isUser;
-  final DateTime timestamp;
-
-  ChatMessage({
-    required this.text,
-    required this.isUser,
-    DateTime? timestamp,
-  }) : timestamp = timestamp ?? DateTime.now();
-
-  Map<String, String> toApiMap() => {
-        'role': isUser ? 'user' : 'assistant',
-        'content': text,
-      };
-}
-
-class HealthChatScreen extends StatefulWidget {
+class HealthChatScreen extends ConsumerStatefulWidget {
   final ApiService apiService;
   final int? dependentId;
 
@@ -31,11 +17,10 @@ class HealthChatScreen extends StatefulWidget {
   });
 
   @override
-  State<HealthChatScreen> createState() => _HealthChatScreenState();
+  ConsumerState<HealthChatScreen> createState() => _HealthChatScreenState();
 }
 
-class _HealthChatScreenState extends State<HealthChatScreen> {
-  final List<ChatMessage> _messages = [];
+class _HealthChatScreenState extends ConsumerState<HealthChatScreen> {
   final TextEditingController _textController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final VoiceService _voiceService = VoiceService();
@@ -48,18 +33,6 @@ class _HealthChatScreenState extends State<HealthChatScreen> {
     'Summarize my prescription schedule',
     'Any instructions for my meds?',
   ];
-
-  @override
-  void initState() {
-    super.initState();
-    // Initial welcome message
-    _messages.add(
-      ChatMessage(
-        text: 'Hello! I am your Gobi Health Assistant powered by OpenRouter AI. Ask me anything about your medications, dose history, and prescriptions.',
-        isUser: false,
-      ),
-    );
-  }
 
   @override
   void dispose() {
@@ -79,6 +52,17 @@ class _HealthChatScreenState extends State<HealthChatScreen> {
         );
       }
     });
+  }
+
+  void _clearChat() {
+    ref.read(chatMessagesProvider.notifier).reset();
+    ScaffoldMessenger.of(context).clearSnackBars();
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Chat conversation reset.'),
+        duration: Duration(seconds: 2),
+      ),
+    );
   }
 
   void _toggleMic() async {
@@ -138,15 +122,18 @@ class _HealthChatScreenState extends State<HealthChatScreen> {
     }
 
     _textController.clear();
+    ref.read(chatMessagesProvider.notifier).addMessage(
+          ChatMessage(text: text, isUser: true),
+        );
     setState(() {
-      _messages.add(ChatMessage(text: text, isUser: true));
       _isLoading = true;
     });
     _scrollToBottom();
 
     try {
-      final history = _messages
-          .where((m) => m != _messages.first) // exclude initial greeting
+      final currentMessages = ref.read(chatMessagesProvider);
+      final history = currentMessages
+          .where((m) => m != currentMessages.first) // exclude initial greeting
           .map((m) => m.toApiMap())
           .toList();
 
@@ -159,21 +146,23 @@ class _HealthChatScreenState extends State<HealthChatScreen> {
       final reply = res['response'] as String? ?? 'No response received.';
 
       if (mounted) {
+        ref.read(chatMessagesProvider.notifier).addMessage(
+              ChatMessage(text: reply, isUser: false),
+            );
         setState(() {
-          _messages.add(ChatMessage(text: reply, isUser: false));
           _isLoading = false;
         });
         _scrollToBottom();
       }
     } catch (e) {
       if (mounted) {
+        ref.read(chatMessagesProvider.notifier).addMessage(
+              ChatMessage(
+                text: '⚠️ Unable to reach health assistant: $e',
+                isUser: false,
+              ),
+            );
         setState(() {
-          _messages.add(
-            ChatMessage(
-              text: '⚠️ Unable to reach health assistant: $e',
-              isUser: false,
-            ),
-          );
           _isLoading = false;
         });
         _scrollToBottom();
@@ -183,6 +172,8 @@ class _HealthChatScreenState extends State<HealthChatScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final messages = ref.watch(chatMessagesProvider);
+
     return Scaffold(
       appBar: AppBar(
         title: Row(
@@ -205,6 +196,13 @@ class _HealthChatScreenState extends State<HealthChatScreen> {
             ),
           ],
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            tooltip: 'New Chat / Clear',
+            onPressed: _clearChat,
+          ),
+        ],
       ),
       body: Column(
         children: [
@@ -213,9 +211,9 @@ class _HealthChatScreenState extends State<HealthChatScreen> {
             child: ListView.builder(
               controller: _scrollController,
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              itemCount: _messages.length,
+              itemCount: messages.length,
               itemBuilder: (context, index) {
-                final msg = _messages[index];
+                final msg = messages[index];
                 return _ChatBubble(message: msg);
               },
             ),
@@ -242,7 +240,7 @@ class _HealthChatScreenState extends State<HealthChatScreen> {
             ),
 
           // Quick Suggestion Chips (when only 1 or 2 messages)
-          if (_messages.length <= 2)
+          if (messages.length <= 2)
             Container(
               height: 40,
               margin: const EdgeInsets.only(bottom: 8),
@@ -365,15 +363,34 @@ class _ChatBubble extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    message.text,
-                    style: TextStyle(
-                      color: isUser ? Colors.white : Colors.black87,
-                      fontSize: 14,
-                      height: 1.35,
+                  if (isUser)
+                    Text(
+                      message.text,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 14,
+                        height: 1.35,
+                      ),
+                    )
+                  else
+                    MarkdownBody(
+                      data: message.text,
+                      styleSheet: MarkdownStyleSheet.fromTheme(Theme.of(context)).copyWith(
+                        p: const TextStyle(fontSize: 14, height: 1.45, color: Colors.black87),
+                        strong: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black87),
+                        listBullet: const TextStyle(color: AppColors.primary, fontSize: 14, fontWeight: FontWeight.bold),
+                        h1: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Colors.black87),
+                        h2: const TextStyle(fontSize: 15.5, fontWeight: FontWeight.bold, color: Colors.black87),
+                        h3: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w600, color: Colors.black87),
+                        code: TextStyle(backgroundColor: Colors.grey.shade200, fontSize: 12.5, fontFamily: 'monospace'),
+                        codeblockDecoration: BoxDecoration(
+                          color: Colors.grey.shade200,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        blockSpacing: 8.0,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 6),
                   Text(
                     '${message.timestamp.hour.toString().padLeft(2, '0')}:${message.timestamp.minute.toString().padLeft(2, '0')}',
                     style: TextStyle(

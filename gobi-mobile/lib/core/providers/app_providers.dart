@@ -75,6 +75,49 @@ final themeModeProvider = StateProvider<bool>((ref) {
   return false; // false = light mode, true = dark mode
 });
 
+// Chat Message Model
+class ChatMessage {
+  final String text;
+  final bool isUser;
+  final DateTime timestamp;
+
+  ChatMessage({
+    required this.text,
+    required this.isUser,
+    DateTime? timestamp,
+  }) : timestamp = timestamp ?? DateTime.now();
+
+  Map<String, String> toApiMap() => {
+        'role': isUser ? 'user' : 'assistant',
+        'content': text,
+      };
+}
+
+// Chat Messages State Notifier for in-memory session persistence
+class ChatMessagesNotifier extends StateNotifier<List<ChatMessage>> {
+  ChatMessagesNotifier() : super([]) {
+    reset();
+  }
+
+  void reset() {
+    state = [
+      ChatMessage(
+        text:
+            'Hello! I am your Gobi Health Assistant powered by OpenRouter AI. Ask me anything about your medications, dose history, and prescriptions.',
+        isUser: false,
+      ),
+    ];
+  }
+
+  void addMessage(ChatMessage message) {
+    state = [...state, message];
+  }
+}
+
+final chatMessagesProvider = StateNotifierProvider<ChatMessagesNotifier, List<ChatMessage>>((ref) {
+  return ChatMessagesNotifier();
+});
+
 
 // Auth State
 class AuthState {
