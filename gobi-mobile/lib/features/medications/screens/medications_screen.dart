@@ -585,6 +585,202 @@ class _MedicationsScreenState extends ConsumerState<MedicationsScreen> {
     );
   }
 
+  void _editMedication(Map<String, dynamic> med) {
+    List<String>? timesList;
+    final rawTimes = med['times_list'] ?? med['times'];
+    if (rawTimes is List) {
+      timesList = rawTimes.map((e) => e.toString()).toList();
+    } else if (rawTimes is String && rawTimes.isNotEmpty) {
+      timesList = rawTimes.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+    }
+
+    ReviewScheduleBottomSheet.show(
+      context: context,
+      apiService: _getApiService(),
+      repository: _getRepository(),
+      medicationId: med['id']?.toString(),
+      initialName: med['name'] as String?,
+      initialDosage: med['dosage'] as String?,
+      initialFrequency: med['frequency'] as String?,
+      initialTimes: timesList,
+      initialDurationWeeks: med['duration_weeks'] as int? ?? 1,
+      initialInstructions: med['instructions'] as String?,
+      dependentId: widget.dependentId,
+    );
+  }
+
+  Future<void> _toggleMedicationPause(Map<String, dynamic> med) async {
+    final medId = med['id']?.toString();
+    final medName = med['name'] ?? 'Medication';
+    if (medId == null) return;
+
+    try {
+      final repo = _getRepository();
+      final isPaused = await repo.toggleMedicationPause(medId);
+      if (mounted) {
+        ScaffoldMessenger.of(context).clearSnackBars();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: isPaused ? AppColors.warning : AppColors.success,
+            behavior: SnackBarBehavior.floating,
+            content: Row(
+              children: [
+                Icon(isPaused ? Icons.pause_circle_outline : Icons.play_circle_outline, color: Colors.white),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    isPaused
+                        ? 'Paused schedule for $medName'
+                        : 'Resumed schedule for $medName',
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: AppColors.error,
+            content: Text('Failed to update schedule status: $e'),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _confirmDeleteMedication(Map<String, dynamic> med) async {
+    final medId = med['id']?.toString();
+    final medName = med['name'] ?? 'Medication';
+    if (medId == null) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Medication Schedule'),
+        content: Text('Are you sure you want to delete "$medName"? All future pending doses will also be removed.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.error,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      try {
+        final repo = _getRepository();
+        await repo.deleteMedication(medId);
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).clearSnackBars();
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              backgroundColor: AppColors.info,
+              duration: const Duration(seconds: 4),
+              behavior: SnackBarBehavior.floating,
+              content: Text('Deleted $medName schedule'),
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              backgroundColor: AppColors.error,
+              content: Text('Failed to delete medication: $e'),
+            ),
+          );
+        }
+      }
+    }
+  }
+
+  void _showMedicationActionSheet(Map<String, dynamic> med) {
+    final medName = med['name'] ?? 'Medication';
+    final dosage = med['dosage'] ?? '';
+    final freq = med['frequency'] ?? '';
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+              Container(
+                width: 36,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 12),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              ListTile(
+                leading: CircleAvatar(
+                  backgroundColor: AppColors.primary.withOpacity(0.12),
+                  child: const Icon(Icons.medication, color: AppColors.primary),
+                ),
+                title: Text(
+                  medName,
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17),
+                ),
+                subtitle: Text('$dosage • $freq'),
+              ),
+              const Divider(),
+              ListTile(
+                leading: const Icon(Icons.edit_outlined, color: AppColors.primary),
+                title: const Text('Edit Schedule', style: TextStyle(fontWeight: FontWeight.w600)),
+                subtitle: const Text('Change dosage, times, or notes'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _editMedication(med);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.pause_circle_outline, color: AppColors.warning),
+                title: const Text('Pause / Resume Schedule', style: TextStyle(fontWeight: FontWeight.w600)),
+                subtitle: const Text('Temporarily hold or restore upcoming doses'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _toggleMedicationPause(med);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.delete_outline, color: AppColors.error),
+                title: const Text('Delete Schedule', style: TextStyle(fontWeight: FontWeight.w600, color: AppColors.error)),
+                subtitle: const Text('Remove medication and future doses'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _confirmDeleteMedication(med);
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
   Widget _buildMedicationsList(List<Map<String, dynamic>> medications, bool isInitialLoading) {
     if (medications.isEmpty && !isInitialLoading) {
       return Card(
@@ -620,52 +816,64 @@ class _MedicationsScreenState extends ConsumerState<MedicationsScreen> {
         return Card(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           margin: const EdgeInsets.only(bottom: 10),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      name,
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                    ),
-                    Chip(
-                      label: Text(
-                        freq,
-                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
-                      ),
-                      backgroundColor: AppColors.primary.withOpacity(0.08),
-                      side: BorderSide.none,
-                      padding: EdgeInsets.zero,
-                      visualDensity: VisualDensity.compact,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                Text('Dosage: $dosage   •   Times: $times', style: TextStyle(color: Colors.grey.shade700)),
-                if (instructions != null && instructions.isNotEmpty) ...[
-                  const SizedBox(height: 6),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(12),
+            onTap: () => _showMedicationActionSheet(med),
+            onLongPress: () => _showMedicationActionSheet(med),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
                   Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Icon(Icons.info_outline, size: 14, color: AppColors.primary),
-                      const SizedBox(width: 4),
                       Expanded(
                         child: Text(
-                          instructions,
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontStyle: FontStyle.italic,
-                            color: Colors.grey.shade600,
-                          ),
+                          name,
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                         ),
+                      ),
+                      Chip(
+                        label: Text(
+                          freq,
+                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+                        ),
+                        backgroundColor: AppColors.primary.withOpacity(0.08),
+                        side: BorderSide.none,
+                        padding: EdgeInsets.zero,
+                        visualDensity: VisualDensity.compact,
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.more_vert, size: 20, color: Colors.grey),
+                        onPressed: () => _showMedicationActionSheet(med),
+                        visualDensity: VisualDensity.compact,
                       ),
                     ],
                   ),
+                  const SizedBox(height: 4),
+                  Text('Dosage: $dosage   •   Times: $times', style: TextStyle(color: Colors.grey.shade700)),
+                  if (instructions != null && instructions.isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        const Icon(Icons.info_outline, size: 14, color: AppColors.primary),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            instructions,
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontStyle: FontStyle.italic,
+                              color: Colors.grey.shade600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ],
-              ],
+              ),
             ),
           ),
         );

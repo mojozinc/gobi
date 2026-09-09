@@ -298,6 +298,176 @@ class AppDatabase extends _$AppDatabase {
     );
   }
 
+  /// Updates an existing medication and regenerates remaining pending doses.
+  Future<void> updateMedicationAndDoses({
+    required String medicationId,
+    required String name,
+    required String dosage,
+    required String unit,
+    required String frequencyType,
+    required List<String> timesOfDay,
+    int durationWeeks = 1,
+    String? instructions,
+    int? inventoryCount,
+  }) async {
+    final now = DateTime.now();
+
+    await transaction(() async {
+      // 1. Update medication details
+      await (update(medications)..where((tbl) => tbl.id.equals(medicationId))).write(
+        MedicationsCompanion(
+          name: Value(name),
+          dosage: Value(dosage),
+          unit: Value(unit),
+          frequencyType: Value(frequencyType),
+          timesOfDayJson: Value(jsonEncode(timesOfDay)),
+          instructions: Value(instructions),
+          inventoryCount: inventoryCount != null ? Value(inventoryCount) : const Value.absent(),
+          updatedAt: Value(now),
+        ),
+      );
+
+      // 2. Remove pending future/today doses to replace with updated schedule
+      await (delete(doseLogs)
+            ..where((tbl) =>
+                tbl.medicationId.equals(medicationId) &
+                tbl.status.equals('pending') &
+                tbl.scheduledTime.isBiggerOrEqualValue(DateTime(now.year, now.month, now.day))))
+          .go();
+
+      // 3. Regenerate pending doses with updated times
+      final daysToGenerate = (durationWeeks * 7).clamp(1, 14);
+      for (int dayOffset = 0; dayOffset < daysToGenerate; dayOffset++) {
+        final date = now.add(Duration(days: dayOffset));
+        for (final timeStr in timesOfDay) {
+          final parts = timeStr.split(':');
+          final hour = int.tryParse(parts[0]) ?? 8;
+          final minute = parts.length > 1 ? (int.tryParse(parts[1]) ?? 0) : 0;
+          final scheduledTime = DateTime(date.year, date.month, date.day, hour, minute);
+          final doseId = _uuid.v4();
+
+          final doseCompanion = DoseLogsCompanion.insert(
+            id: doseId,
+            medicationId: medicationId,
+            scheduledTime: scheduledTime,
+            status: 'pending',
+            createdAt: now,
+            updatedAt: now,
+            isDeleted: const Value(false),
+          );
+
+          await into(doseLogs).insert(doseCompanion);
+
+          await recordCdcEvent(
+            entityType: 'dose_log',
+            entityId: doseId,
+            operation: 'INSERT',
+            payload: {
+              'id': doseId,
+              'medication_id': medicationId,
+              'scheduled_time': scheduledTime.toIso8601String(),
+              'status': 'pending',
+            },
+          );
+        }
+      }
+
+      // 4. Record CDC update event for medication
+      await recordCdcEvent(
+        entityType: 'medication',
+        entityId: medicationId,
+        operation: 'UPDATE',
+        payload: {
+          'id': medicationId,
+          'name': name,
+          'dosage': dosage,
+          'unit': unit,
+          'frequency_type': frequencyType,
+          'times_of_day': timesOfDay,
+          'duration_weeks': durationWeeks,
+          'instructions': instructions,
+          'updated_at': now.toIso8601String(),
+        },
+      );
+    });
+  }
+
+  /// Soft-deletes a medication and removes all pending future doses.
+  Future<void> deleteMedication({required String medicationId}) async {
+    final now = DateTime.now();
+
+    await transaction(() async {
+      // 1. Soft-delete medication
+      await (update(medications)..where((tbl) => tbl.id.equals(medicationId))).write(
+        MedicationsCompanion(
+          isDeleted: const Value(true),
+          updatedAt: Value(now),
+        ),
+      );
+
+      // 2. Soft-delete pending doses
+      await (update(doseLogs)
+            ..where((tbl) =>
+                tbl.medicationId.equals(medicationId) & tbl.status.equals('pending')))
+          .write(
+        DoseLogsCompanion(
+          isDeleted: const Value(true),
+          updatedAt: Value(now),
+        ),
+      );
+
+      // 3. Record CDC delete event
+      await recordCdcEvent(
+        entityType: 'medication',
+        entityId: medicationId,
+        operation: 'DELETE',
+        payload: {
+          'id': medicationId,
+          'is_deleted': true,
+          'updated_at': now.toIso8601String(),
+        },
+      );
+    });
+  }
+
+  /// Toggles pause status for a medication's upcoming pending doses.
+  Future<bool> toggleMedicationPause({required String medicationId}) async {
+    final now = DateTime.now();
+    final candidateDoses = await (select(doseLogs)
+          ..where((tbl) =>
+              tbl.medicationId.equals(medicationId) &
+              tbl.isDeleted.equals(false) &
+              (tbl.status.equals('pending') | tbl.status.equals('paused'))))
+        .get();
+
+    final isCurrentlyPaused = candidateDoses.isNotEmpty && candidateDoses.every((d) => d.status == 'paused');
+    final newStatus = isCurrentlyPaused ? 'pending' : 'paused';
+
+    await transaction(() async {
+      for (final dose in candidateDoses) {
+        await (update(doseLogs)..where((tbl) => tbl.id.equals(dose.id))).write(
+          DoseLogsCompanion(
+            status: Value(newStatus),
+            updatedAt: Value(now),
+          ),
+        );
+      }
+
+      await recordCdcEvent(
+        entityType: 'medication',
+        entityId: medicationId,
+        operation: 'UPDATE',
+        payload: {
+          'id': medicationId,
+          'schedule_status': newStatus,
+          'updated_at': now.toIso8601String(),
+        },
+      );
+    });
+
+    return newStatus == 'paused';
+  }
+
   /// Upserts a medication record from cloud sync.
   Future<void> upsertMedicationFromCloud(MedicationEntry entry) async {
     await into(medications).insertOnConflictUpdate(entry);

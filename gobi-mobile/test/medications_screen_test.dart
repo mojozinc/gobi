@@ -117,6 +117,70 @@ void main() {
     await tester.pumpWidget(const SizedBox());
     await tester.pump(const Duration(milliseconds: 100));
   });
+
+  testWidgets('Long pressing medication card opens action menu with Edit, Pause, and Delete', (WidgetTester tester) async {
+    final medId = await repository.addMedication({
+      'name': 'Metformin',
+      'dosage': '500mg',
+      'frequency': 'twice daily',
+      'times': ['08:00', '20:00'],
+      'duration_weeks': 2,
+    });
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          appDatabaseProvider.overrideWithValue(db),
+          medicationsRepositoryProvider.overrideWithValue(repository),
+          apiServiceProvider.overrideWithValue(apiService),
+        ],
+        child: MaterialApp(
+          home: MedicationsScreen(
+            repository: repository,
+            apiService: apiService,
+          ),
+        ),
+      ),
+    );
+
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+
+    // Find active medication card
+    final medCard = find.text('Metformin').last;
+    expect(medCard, findsOneWidget);
+
+    // Long press on active medication card
+    await tester.longPress(medCard);
+    await tester.pumpAndSettle();
+
+    // Verify action sheet options are displayed
+    expect(find.text('Edit Schedule'), findsOneWidget);
+    expect(find.text('Pause / Resume Schedule'), findsOneWidget);
+    expect(find.text('Delete Schedule'), findsOneWidget);
+
+    // Tap Delete Schedule
+    await tester.tap(find.text('Delete Schedule'));
+    await tester.pumpAndSettle();
+
+    // Verify confirmation dialog
+    expect(find.text('Delete Medication Schedule'), findsOneWidget);
+    expect(find.textContaining('Are you sure you want to delete'), findsOneWidget);
+
+    // Confirm deletion
+    final deleteConfirmBtn = find.widgetWithText(ElevatedButton, 'Delete');
+    await tester.tap(deleteConfirmBtn);
+    await tester.pumpAndSettle();
+
+    // Verify snackbar feedback and removal from UI
+    expect(find.textContaining('Deleted Metformin schedule'), findsOneWidget);
+
+    // Clean up snackbars and unmount
+    ScaffoldMessenger.of(tester.element(find.byType(MedicationsScreen))).removeCurrentSnackBar();
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.pumpWidget(const SizedBox());
+    await tester.pump(const Duration(milliseconds: 100));
+  });
 }
 
 

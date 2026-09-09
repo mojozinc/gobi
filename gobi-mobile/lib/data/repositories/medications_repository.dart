@@ -129,6 +129,47 @@ class MedicationsRepository {
     return medId;
   }
 
+  /// Updates a medication schedule in local SQLite and updates upcoming doses.
+  Future<void> updateMedication(String id, Map<String, dynamic> data) async {
+    final name = (data['name'] as String?)?.trim() ?? 'Medication';
+    final dosage = (data['dosage'] as String?)?.trim() ?? '1 dose';
+    final unit = (data['unit'] as String?)?.trim() ?? '';
+    final frequency = (data['frequency'] as String?)?.trim() ?? 'daily';
+    final durationWeeks = (data['duration_weeks'] as int?) ?? 1;
+    final instructions = data['instructions'] as String?;
+    final inventoryCount = data['inventory_count'] as int?;
+
+    List<String> times = ['08:00'];
+    final rawTimes = data['times'];
+    if (rawTimes is String && rawTimes.isNotEmpty) {
+      times = rawTimes.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+    } else if (rawTimes is List && rawTimes.isNotEmpty) {
+      times = rawTimes.map((e) => e.toString()).toList();
+    }
+
+    await _db.updateMedicationAndDoses(
+      medicationId: id,
+      name: name,
+      dosage: dosage,
+      unit: unit,
+      frequencyType: frequency,
+      timesOfDay: times,
+      durationWeeks: durationWeeks,
+      instructions: instructions,
+      inventoryCount: inventoryCount,
+    );
+  }
+
+  /// Soft-deletes a medication from local SQLite and removes pending doses.
+  Future<void> deleteMedication(String id) async {
+    await _db.deleteMedication(medicationId: id);
+  }
+
+  /// Toggles pause status for a medication's upcoming pending doses.
+  Future<bool> toggleMedicationPause(String id) async {
+    return await _db.toggleMedicationPause(medicationId: id);
+  }
+
   /// Marks a dose as taken in local SQLite with CDC logging, and syncs in background.
   Future<void> takeDose(dynamic doseId) async {
     final idStr = doseId.toString();

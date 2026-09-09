@@ -39,48 +39,103 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
     return Scaffold(
       body: screens[_currentIndex],
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _currentIndex,
-        height: 64,
-        labelBehavior: NavigationDestinationLabelBehavior.onlyShowSelected,
-        onDestinationSelected: (index) {
-          setState(() {
-            _currentIndex = index;
-          });
-        },
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.home_outlined),
-            selectedIcon: Icon(Icons.home),
-            label: 'Home',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.medication_outlined),
-            selectedIcon: Icon(Icons.medication),
-            label: 'Meds',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.chat_bubble_outline),
-            selectedIcon: Icon(Icons.chat_bubble),
-            label: 'AI Chat',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.folder_outlined),
-            selectedIcon: Icon(Icons.folder),
-            label: 'Docs',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.people_outline),
-            selectedIcon: Icon(Icons.people),
-            label: 'Family',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.settings_outlined),
-            selectedIcon: Icon(Icons.settings),
-            label: 'Settings',
-          ),
-        ],
+      bottomNavigationBar: NavigationBarTheme(
+        data: NavigationBarThemeData(
+          indicatorColor: Colors.transparent,
+          labelTextStyle: MaterialStateProperty.resolveWith((states) {
+            if (states.contains(MaterialState.selected)) {
+              return const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                color: AppColors.primary,
+                letterSpacing: 0.2,
+              );
+            }
+            return TextStyle(
+              fontSize: 10.5,
+              fontWeight: FontWeight.w500,
+              color: Colors.grey.shade600,
+            );
+          }),
+        ),
+        child: NavigationBar(
+          selectedIndex: _currentIndex,
+          height: 72,
+          backgroundColor: Colors.white,
+          elevation: 8,
+          labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+          onDestinationSelected: (index) {
+            setState(() {
+              _currentIndex = index;
+            });
+          },
+          destinations: [
+            _buildNavDestination(
+              icon: Icons.home_outlined,
+              selectedIcon: Icons.home,
+              label: 'Home',
+              isSelected: _currentIndex == 0,
+            ),
+            _buildNavDestination(
+              icon: Icons.medication_outlined,
+              selectedIcon: Icons.medication,
+              label: 'Meds',
+              isSelected: _currentIndex == 1,
+            ),
+            _buildNavDestination(
+              icon: Icons.chat_bubble_outline,
+              selectedIcon: Icons.chat_bubble,
+              label: 'AI Chat',
+              isSelected: _currentIndex == 2,
+            ),
+            _buildNavDestination(
+              icon: Icons.folder_outlined,
+              selectedIcon: Icons.folder,
+              label: 'Docs',
+              isSelected: _currentIndex == 3,
+            ),
+            _buildNavDestination(
+              icon: Icons.people_outline,
+              selectedIcon: Icons.people,
+              label: 'Family',
+              isSelected: _currentIndex == 4,
+            ),
+            _buildNavDestination(
+              icon: Icons.settings_outlined,
+              selectedIcon: Icons.settings,
+              label: 'Settings',
+              isSelected: _currentIndex == 5,
+            ),
+          ],
+        ),
       ),
+    );
+  }
+
+  NavigationDestination _buildNavDestination({
+    required IconData icon,
+    required IconData selectedIcon,
+    required String label,
+    required bool isSelected,
+  }) {
+    return NavigationDestination(
+      icon: Icon(icon, size: 22, color: Colors.grey.shade600),
+      selectedIcon: Container(
+        padding: const EdgeInsets.all(4),
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: AppColors.primary.withOpacity(0.12),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.primary.withOpacity(0.38),
+              blurRadius: 10,
+              spreadRadius: 1.5,
+            ),
+          ],
+        ),
+        child: Icon(selectedIcon, size: 26, color: AppColors.primary),
+      ),
+      label: label,
     );
   }
 }
