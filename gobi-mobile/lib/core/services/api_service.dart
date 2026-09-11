@@ -81,30 +81,38 @@ class ApiService {
     }
   }
 
-  /// Internal helper to execute authenticated POST requests with automatic 401 recovery retry.
   Future<http.Response> _postAuthenticated(Uri uri, Map<String, dynamic> body) async {
     if (!isAuthenticated) {
       await ensureAuthenticated();
     }
 
-    var res = await _client.post(
-      uri,
-      headers: _headers,
-      body: jsonEncode(body),
-    );
-
-    // If 401 Unauthorized (expired or invalidated token), clear stale token, re-auth and retry once
-    if (res.statusCode == 401) {
-      clearAuth();
-      await ensureAuthenticated();
-      res = await _client.post(
+    debugPrint('[ApiService] 🚀 POST $uri (auth: ${isAuthenticated ? "token present" : "no token"})');
+    try {
+      var res = await _client.post(
         uri,
         headers: _headers,
         body: jsonEncode(body),
       );
-    }
+      debugPrint('[ApiService] 📥 Response ${res.statusCode} from $uri (${res.bodyBytes.length} bytes)');
 
-    return res;
+      // If 401 Unauthorized (expired or invalidated token), clear stale token, re-auth and retry once
+      if (res.statusCode == 401) {
+        debugPrint('[ApiService] ⚠️ Received 401. Re-authenticating and retrying once...');
+        clearAuth();
+        await ensureAuthenticated();
+        res = await _client.post(
+          uri,
+          headers: _headers,
+          body: jsonEncode(body),
+        );
+        debugPrint('[ApiService] 📥 Retry response ${res.statusCode} from $uri');
+      }
+
+      return res;
+    } catch (e) {
+      debugPrint('[ApiService] ❌ Network connection failure for $uri: $e');
+      rethrow;
+    }
   }
 
   /// Internal helper to execute authenticated GET requests with automatic 401 recovery retry.
@@ -113,15 +121,24 @@ class ApiService {
       await ensureAuthenticated();
     }
 
-    var res = await _client.get(uri, headers: _headers);
+    debugPrint('[ApiService] 🚀 GET $uri (auth: ${isAuthenticated ? "token present" : "no token"})');
+    try {
+      var res = await _client.get(uri, headers: _headers);
+      debugPrint('[ApiService] 📥 Response ${res.statusCode} from $uri');
 
-    if (res.statusCode == 401) {
-      clearAuth();
-      await ensureAuthenticated();
-      res = await _client.get(uri, headers: _headers);
+      if (res.statusCode == 401) {
+        debugPrint('[ApiService] ⚠️ Received 401. Re-authenticating and retrying once...');
+        clearAuth();
+        await ensureAuthenticated();
+        res = await _client.get(uri, headers: _headers);
+        debugPrint('[ApiService] 📥 Retry response ${res.statusCode} from $uri');
+      }
+
+      return res;
+    } catch (e) {
+      debugPrint('[ApiService] ❌ Network connection failure for $uri: $e');
+      rethrow;
     }
-
-    return res;
   }
 
   // Auth
