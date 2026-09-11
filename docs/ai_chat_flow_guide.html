@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="light">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -11,6 +11,8 @@
     :root {
       --bg: #ffffff;
       --bg-alt: #f8fafc;
+      --bg-viewport: #fafbfc;
+      --grid-dot: #cbd5e1;
       --text: #0f172a;
       --text-muted: #475569;
       --text-subtle: #94a3b8;
@@ -24,7 +26,31 @@
       --warning-border: #f59e0b;
       --warning-text: #92400e;
       --code-bg: #f1f5f9;
+      --code-text: #0369a1;
+      --shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
       --radius: 8px;
+    }
+
+    [data-theme="dark"] {
+      --bg: #0f172a;
+      --bg-alt: #1e293b;
+      --bg-viewport: #0b1120;
+      --grid-dot: #334155;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --text-subtle: #64748b;
+      --border: #334155;
+      --border-dark: #475569;
+      --primary: #38bdf8;
+      --primary-subtle: #082f49;
+      --accent: #2dd4bf;
+      --accent-subtle: #134e4a;
+      --warning-bg: #451a03;
+      --warning-border: #d97706;
+      --warning-text: #fde68a;
+      --code-bg: #1e293b;
+      --code-text: #38bdf8;
+      --shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
     }
 
     * {
@@ -41,6 +67,7 @@
       font-size: 15px;
       -webkit-font-smoothing: antialiased;
       padding: 48px 20px 80px;
+      transition: background-color 0.15s ease, color 0.15s ease;
     }
 
     .container {
@@ -48,11 +75,38 @@
       margin: 0 auto;
     }
 
-    /* Header */
+    /* Header & Theme Toggle */
     header {
       margin-bottom: 40px;
       padding-bottom: 24px;
       border-bottom: 1px solid var(--border);
+    }
+
+    .header-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    .theme-toggle {
+      background: var(--bg-alt);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 6px 12px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: background 0.15s, border-color 0.15s;
+      user-select: none;
+    }
+
+    .theme-toggle:hover {
+      background: var(--border);
     }
 
     .badge {
@@ -65,7 +119,6 @@
       background-color: var(--primary-subtle);
       padding: 4px 10px;
       border-radius: 4px;
-      margin-bottom: 12px;
     }
 
     h1 {
@@ -511,7 +564,30 @@
       }
     });
 
+    // Theme Toggle Logic
+    const storedTheme = localStorage.getItem('gobi_doc_theme') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    document.documentElement.setAttribute('data-theme', storedTheme);
+
     document.addEventListener('DOMContentLoaded', () => {
+      const toggleBtn = document.getElementById('theme-toggle');
+      const root = document.documentElement;
+
+      function setTheme(theme) {
+        root.setAttribute('data-theme', theme);
+        localStorage.setItem('gobi_doc_theme', theme);
+        if (toggleBtn) {
+          toggleBtn.querySelector('.theme-icon').textContent = theme === 'dark' ? '☀️' : '🌙';
+          toggleBtn.querySelector('.theme-text').textContent = theme === 'dark' ? 'Light Mode' : 'Dark Mode';
+        }
+      }
+
+      setTheme(storedTheme);
+
+      toggleBtn?.addEventListener('click', () => {
+        const nextTheme = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+        setTheme(nextTheme);
+      });
+
       const wrapper = document.getElementById('diagram-wrapper');
       const viewport = document.getElementById('diagram-viewport');
       const canvas = document.getElementById('diagram-canvas');
@@ -638,7 +714,12 @@
 <div class="container">
 
   <header>
-    <div class="badge">Architecture & Flow Reference</div>
+    <div class="header-top">
+      <div class="badge">Architecture & Flow Reference</div>
+      <button class="theme-toggle" id="theme-toggle" title="Toggle Light/Dark Theme">
+        <span class="theme-icon">🌙</span> <span class="theme-text">Dark Mode</span>
+      </button>
+    </div>
     <h1>Gobi AI Health Assistant: End-to-End Flow</h1>
     <p class="subtitle">A complete technical walkthrough of the Flutter UI, RAG grounding, OpenRouter inference, and common diagnostic checks.</p>
   </header>
