@@ -1,0 +1,939 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gobi AI Chat Architecture & Flow Guide</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #ffffff;
+      --bg-alt: #f8fafc;
+      --text: #0f172a;
+      --text-muted: #475569;
+      --text-subtle: #94a3b8;
+      --border: #e2e8f0;
+      --border-dark: #cbd5e1;
+      --primary: #0284c7;
+      --primary-subtle: #e0f2fe;
+      --accent: #0f766e;
+      --accent-subtle: #ccfbf1;
+      --warning-bg: #fffbeb;
+      --warning-border: #f59e0b;
+      --warning-text: #92400e;
+      --code-bg: #f1f5f9;
+      --radius: 8px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      line-height: 1.65;
+      font-size: 15px;
+      -webkit-font-smoothing: antialiased;
+      padding: 48px 20px 80px;
+    }
+
+    .container {
+      max-width: 840px;
+      margin: 0 auto;
+    }
+
+    /* Header */
+    header {
+      margin-bottom: 40px;
+      padding-bottom: 24px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .badge {
+      display: inline-block;
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--primary);
+      background-color: var(--primary-subtle);
+      padding: 4px 10px;
+      border-radius: 4px;
+      margin-bottom: 12px;
+    }
+
+    h1 {
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--text);
+      letter-spacing: -0.02em;
+      margin-bottom: 8px;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--text-muted);
+    }
+
+    /* Navigation / TOC */
+    .toc {
+      background-color: var(--bg-alt);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px 24px;
+      margin-bottom: 40px;
+    }
+
+    .toc-title {
+      font-size: 13px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      margin-bottom: 12px;
+    }
+
+    .toc-list {
+      list-style: none;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 8px 16px;
+    }
+
+    .toc-list a {
+      color: var(--primary);
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    .toc-list a:hover {
+      text-decoration: underline;
+    }
+
+    /* Typography */
+    h2 {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--text);
+      letter-spacing: -0.01em;
+      margin-top: 48px;
+      margin-bottom: 16px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    h3 {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text);
+      margin-top: 24px;
+      margin-bottom: 10px;
+    }
+
+    p {
+      margin-bottom: 16px;
+      color: var(--text);
+    }
+
+    ul, ol {
+      margin-bottom: 16px;
+      padding-left: 20px;
+    }
+
+    li {
+      margin-bottom: 6px;
+    }
+
+    /* Diagrams & Visuals with Pan/Zoom Toolbar */
+    .diagram-wrapper {
+      position: relative;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      margin: 24px 0;
+      overflow: hidden;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    }
+
+    .diagram-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 10px 16px;
+      background: var(--bg-alt);
+      border-bottom: 1px solid var(--border);
+      font-size: 13px;
+    }
+
+    .diagram-toolbar-title {
+      font-weight: 600;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .diagram-hint {
+      font-size: 12px;
+      color: var(--text-subtle);
+      font-weight: 400;
+    }
+
+    .diagram-controls {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .btn-control {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 5px 10px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      transition: background 0.15s, border-color 0.15s;
+      user-select: none;
+    }
+
+    .btn-control:hover {
+      background: var(--border);
+      color: var(--text);
+    }
+
+    .btn-control:active {
+      background: var(--border-dark);
+    }
+
+    .zoom-badge {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-muted);
+      min-width: 48px;
+      text-align: center;
+      font-family: 'JetBrains Mono', monospace;
+      padding: 2px 4px;
+    }
+
+    .diagram-viewport {
+      height: 600px;
+      overflow: hidden;
+      cursor: grab;
+      position: relative;
+      background-color: #fafbfc;
+      background-image: radial-gradient(circle, #cbd5e1 1px, transparent 1px);
+      background-size: 24px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .diagram-viewport.panning {
+      cursor: grabbing;
+      user-select: none;
+    }
+
+    .diagram-canvas {
+      transform-origin: center center;
+      transition: transform 0.05s ease-out;
+      will-change: transform;
+      padding: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .diagram-canvas svg {
+      max-width: none !important;
+      height: auto !important;
+      filter: drop-shadow(0 2px 8px rgba(0,0,0,0.04));
+    }
+
+    /* Fullscreen Mode */
+    .diagram-wrapper.fullscreen {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      z-index: 9999;
+      border-radius: 0;
+      margin: 0;
+      border: none;
+      display: flex;
+      flex-direction: column;
+      background: #ffffff;
+    }
+
+    .diagram-wrapper.fullscreen .diagram-viewport {
+      flex: 1;
+      height: auto;
+    }
+
+    .diagram-caption {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-muted);
+      text-align: center;
+      padding: 8px 16px;
+      background: var(--bg-alt);
+      border-top: 1px solid var(--border);
+    }
+
+    /* Flow Grid */
+    .flow-steps {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      display: flex;
+      gap: 16px;
+      padding: 16px;
+      background: var(--bg-alt);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+    }
+
+    .step-number {
+      flex-shrink: 0;
+      width: 32px;
+      height: 32px;
+      background: var(--primary);
+      color: #fff;
+      font-weight: 700;
+      font-size: 14px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .step-content {
+      flex-grow: 1;
+    }
+
+    .step-header {
+      font-weight: 600;
+      font-size: 15px;
+      color: var(--text);
+      margin-bottom: 4px;
+    }
+
+    .step-body {
+      font-size: 14px;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+
+    /* Comparison Table */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 24px 0;
+      font-size: 14px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+
+    th {
+      background: var(--bg-alt);
+      text-align: left;
+      padding: 12px 16px;
+      font-weight: 600;
+      color: var(--text);
+      border-bottom: 1px solid var(--border);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+
+    tr:last-child td {
+      border-bottom: none;
+    }
+
+    /* Code Blocks */
+    code {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      background: var(--code-bg);
+      padding: 2px 6px;
+      border-radius: 4px;
+      color: #0369a1;
+    }
+
+    pre {
+      background: var(--bg-alt);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+      overflow-x: auto;
+      margin: 16px 0;
+    }
+
+    pre code {
+      background: transparent;
+      padding: 0;
+      color: var(--text);
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    /* Alerts & Callouts */
+    .callout {
+      border-left: 4px solid;
+      border-radius: 0 var(--radius) var(--radius) 0;
+      padding: 16px 18px;
+      margin: 20px 0;
+      background: var(--bg-alt);
+      font-size: 14px;
+    }
+
+    .callout-warning {
+      background-color: var(--warning-bg);
+      border-color: var(--warning-border);
+      color: var(--warning-text);
+    }
+
+    .callout-warning strong {
+      color: #78350f;
+    }
+
+    .callout-info {
+      background-color: var(--primary-subtle);
+      border-color: var(--primary);
+      color: #0369a1;
+    }
+
+    .callout-info strong {
+      color: #075985;
+    }
+
+    /* Key Value Grid */
+    .kv-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 16px;
+      margin: 20px 0;
+    }
+
+    .kv-card {
+      background: var(--bg-alt);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+    }
+
+    .kv-title {
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+    }
+
+    .kv-value {
+      font-weight: 600;
+      font-size: 15px;
+      color: var(--text);
+    }
+
+    .kv-desc {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    /* Footer */
+    footer {
+      margin-top: 64px;
+      padding-top: 24px;
+      border-top: 1px solid var(--border);
+      font-size: 13px;
+      color: var(--text-subtle);
+      text-align: center;
+    }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'neutral',
+      sequence: {
+        diagramMarginX: 50,
+        diagramMarginY: 30,
+        actorMargin: 80,
+        width: 170,
+        height: 52,
+        boxMargin: 12,
+        boxTextMargin: 6,
+        noteMargin: 16,
+        messageMargin: 42,
+        messageFontSize: 15,
+        actorFontSize: 16,
+        noteFontSize: 14,
+        wrap: true,
+        useMaxWidth: false
+      },
+      themeVariables: {
+        fontFamily: 'Inter, sans-serif',
+        fontSize: '15px',
+        primaryColor: '#e0f2fe',
+        primaryBorderColor: '#0284c7',
+        primaryTextColor: '#0f172a',
+        lineColor: '#475569',
+        secondaryColor: '#f8fafc',
+        tertiaryColor: '#f1f5f9'
+      }
+    });
+
+    document.addEventListener('DOMContentLoaded', () => {
+      const wrapper = document.getElementById('diagram-wrapper');
+      const viewport = document.getElementById('diagram-viewport');
+      const canvas = document.getElementById('diagram-canvas');
+      const zoomBadge = document.getElementById('zoom-badge');
+      const btnZoomIn = document.getElementById('btn-zoom-in');
+      const btnZoomOut = document.getElementById('btn-zoom-out');
+      const btnZoomReset = document.getElementById('btn-zoom-reset');
+      const btnFitWidth = document.getElementById('btn-fit-width');
+      const btnFullscreen = document.getElementById('btn-fullscreen');
+
+      let scale = 1.15;
+      let panX = 0;
+      let panY = 0;
+      let isPanning = false;
+      let startX = 0;
+      let startY = 0;
+
+      function updateTransform() {
+        canvas.style.transform = `translate(${panX}px, ${panY}px) scale(${scale})`;
+        if (zoomBadge) zoomBadge.textContent = `${Math.round(scale * 100)}%`;
+      }
+
+      function setZoom(newScale, centerX, centerY) {
+        const clampedScale = Math.min(Math.max(newScale, 0.4), 4.0);
+        if (centerX !== undefined && centerY !== undefined) {
+          const rect = viewport.getBoundingClientRect();
+          const mouseX = centerX - rect.left - rect.width / 2;
+          const mouseY = centerY - rect.top - rect.height / 2;
+          panX -= (mouseX - panX) * (clampedScale / scale - 1);
+          panY -= (mouseY - panY) * (clampedScale / scale - 1);
+        }
+        scale = clampedScale;
+        updateTransform();
+      }
+
+      btnZoomIn?.addEventListener('click', () => setZoom(scale + 0.25));
+      btnZoomOut?.addEventListener('click', () => setZoom(scale - 0.25));
+      btnZoomReset?.addEventListener('click', () => {
+        scale = 1.15;
+        panX = 0;
+        panY = 0;
+        updateTransform();
+      });
+
+      btnFitWidth?.addEventListener('click', () => {
+        const svg = canvas.querySelector('svg');
+        if (svg) {
+          const svgRect = svg.getBoundingClientRect();
+          const currentSvgWidth = svgRect.width / scale;
+          const targetWidth = viewport.clientWidth - 80;
+          scale = Math.min(Math.max(targetWidth / currentSvgWidth, 0.6), 3.0);
+          panX = 0;
+          panY = 0;
+          updateTransform();
+        }
+      });
+
+      btnFullscreen?.addEventListener('click', () => {
+        wrapper.classList.toggle('fullscreen');
+        const isFull = wrapper.classList.contains('fullscreen');
+        btnFullscreen.textContent = isFull ? '✕ Exit Fullscreen' : '⛶ Fullscreen';
+        if (isFull) {
+          scale = 1.45; // Optimal large size for 24-inch monitors
+          panX = 0;
+          panY = 0;
+        } else {
+          scale = 1.15;
+          panX = 0;
+          panY = 0;
+        }
+        updateTransform();
+      });
+
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && wrapper?.classList.contains('fullscreen')) {
+          wrapper.classList.remove('fullscreen');
+          btnFullscreen.textContent = '⛶ Fullscreen';
+          scale = 1.15;
+          panX = 0;
+          panY = 0;
+          updateTransform();
+        }
+      });
+
+      // Mouse Wheel Zoom
+      viewport?.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        const zoomDelta = e.deltaY < 0 ? 0.15 : -0.15;
+        setZoom(scale + zoomDelta, e.clientX, e.clientY);
+      }, { passive: false });
+
+      // Click & Drag Pan
+      viewport?.addEventListener('mousedown', (e) => {
+        if (e.button !== 0) return;
+        isPanning = true;
+        startX = e.clientX - panX;
+        startY = e.clientY - panY;
+        viewport.classList.add('panning');
+      });
+
+      window.addEventListener('mousemove', (e) => {
+        if (!isPanning) return;
+        panX = e.clientX - startX;
+        panY = e.clientY - startY;
+        updateTransform();
+      });
+
+      window.addEventListener('mouseup', () => {
+        if (isPanning) {
+          isPanning = false;
+          viewport?.classList.remove('panning');
+        }
+      });
+
+      // Initial transform after Mermaid renders
+      setTimeout(() => {
+        updateTransform();
+      }, 500);
+    });
+  </script>
+</head>
+<body>
+
+<div class="container">
+
+  <header>
+    <div class="badge">Architecture & Flow Reference</div>
+    <h1>Gobi AI Health Assistant: End-to-End Flow</h1>
+    <p class="subtitle">A complete technical walkthrough of the Flutter UI, RAG grounding, OpenRouter inference, and common diagnostic checks.</p>
+  </header>
+
+  <nav class="toc">
+    <div class="toc-title">Table of Contents</div>
+    <ul class="toc-list">
+      <li><a href="#overview">1. The Two AI Systems in Gobi</a></li>
+      <li><a href="#sequence">2. End-to-End Sequence Diagram</a></li>
+      <li><a href="#step-by-step">3. Detailed Step-by-Step Flow</a></li>
+      <li><a href="#data-gap">4. The "Local SQLite vs. Cloud Postgres" Gap</a></li>
+      <li><a href="#troubleshooting">5. Why It Might Not Be Working As Intended</a></li>
+      <li><a href="#diagnostics">6. Debugging & Verification Checklist</a></li>
+    </ul>
+  </nav>
+
+  <!-- Section 1 -->
+  <section id="overview">
+    <h2>1. The Two AI Systems in Gobi</h2>
+    <p>Gobi separates AI capabilities into two distinct engines. Understanding this difference is critical when evaluating behavior:</p>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Capability</th>
+          <th>Conversational Chat (RAG Q&A)</th>
+          <th>Voice Intent Parser (Tool Calling)</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>API Route</strong></td>
+          <td><code>POST /api/v1/ai/chat</code></td>
+          <td><code>POST /api/v1/ai/parse-intent</code></td>
+        </tr>
+        <tr>
+          <td><strong>UI Location</strong></td>
+          <td><strong>Health Chat Screen</strong> (tab 3 / floating bubble)</td>
+          <td><strong>Voice Assistant Mic Button</strong> on Home/Meds</td>
+        </tr>
+        <tr>
+          <td><strong>Primary Goal</strong></td>
+          <td>Answers clinical questions, interprets prescriptions, and reviews dose history.</td>
+          <td>Extracts actionable intents into database operations (e.g., <code>SET_SCHEDULE</code>, <code>RECORD_DOSE</code>).</td>
+        </tr>
+        <tr>
+          <td><strong>Mutates DB?</strong></td>
+          <td><strong>No.</strong> Read-only contextual grounding.</td>
+          <td><strong>Yes.</strong> Creates medication schedules or marks doses taken.</td>
+        </tr>
+        <tr>
+          <td><strong>Model</strong></td>
+          <td><code>meta-llama/llama-3.3-70b-instruct</code></td>
+          <td><code>meta-llama/llama-3.3-70b-instruct</code> (Tool Calling)</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- Section 2 -->
+  <section id="sequence">
+    <h2>2. End-to-End Sequence Diagram</h2>
+    <p>This diagram traces a chat query from the mobile widget to OpenRouter and back. Use the toolbar or mouse to pan, zoom, and enter fullscreen mode:</p>
+
+    <div class="diagram-wrapper" id="diagram-wrapper">
+      <div class="diagram-toolbar">
+        <div class="diagram-toolbar-title">
+          <span>Interactive Sequence Viewer</span>
+          <span class="diagram-hint">(Drag to pan &bull; Scroll to zoom &bull; ESC to exit fullscreen)</span>
+        </div>
+        <div class="diagram-controls">
+          <button class="btn-control" id="btn-zoom-in" title="Zoom In">+</button>
+          <button class="btn-control" id="btn-zoom-out" title="Zoom Out">&minus;</button>
+          <span class="zoom-badge" id="zoom-badge">115%</span>
+          <button class="btn-control" id="btn-zoom-reset" title="Reset Zoom">Reset</button>
+          <button class="btn-control" id="btn-fit-width" title="Fit to Screen Width">&harr; Fit Width</button>
+          <button class="btn-control" id="btn-fullscreen" title="Toggle Fullscreen View">&#x26F6; Fullscreen</button>
+        </div>
+      </div>
+
+      <div class="diagram-viewport" id="diagram-viewport">
+        <div class="diagram-canvas" id="diagram-canvas">
+          <div class="mermaid">
+sequenceDiagram
+    autonumber
+    actor User
+    participant UI as HealthChatScreen<br/>(Flutter)
+    participant State as ChatMessagesNotifier<br/>(Riverpod)
+    participant Service as ApiService<br/>(Mobile Network)
+    participant API as FastAPI Backend<br/>(/api/v1/ai/chat)
+    participant RAG as RAG Context Builder<br/>(rag.py)
+    participant DB as PostgreSQL<br/>(gobi_db)
+    participant LLM as OpenRouter AI<br/>(Llama 3.3 70B)
+
+    User->>UI: Types query or taps quick chip
+    UI->>State: addMessage(ChatMessage: user query)
+    UI->>Service: sendHealthChat(query, history, dependentId)
+    
+    rect rgb(240, 248, 255)
+    Note over Service: 1. Auto-login if unauthenticated<br/>2. Attach Bearer token<br/>3. Handle 401 retry if expired
+    Service->>API: POST /api/v1/ai/chat
+    end
+
+    rect rgb(255, 250, 240)
+    Note over API: 4. Extract User ID from JWT
+    API->>RAG: build_user_health_context(db, user_id, dependent_id)
+    RAG->>DB: SELECT active meds, past 7d doses, prescriptions
+    DB-->>RAG: Database records
+    RAG-->>API: Formatted Markdown context
+    end
+
+    rect rgb(240, 255, 240)
+    Note over API,LLM: 5. Grounded Prompt (System + Health Context + History + Query)
+    API->>LLM: POST /chat/completions
+    LLM-->>API: Assistant response text
+    end
+
+    API-->>Service: ChatResponse JSON { "response": "..." }
+    Service-->>UI: Map result
+    UI->>State: addMessage(ChatMessage: AI reply)
+    UI->>User: Renders Markdown response bubble
+          </div>
+        </div>
+      </div>
+
+      <div class="diagram-caption">Figure 1: Full request/response lifecycle for Gobi Health Chat</div>
+    </div>
+  </section>
+
+  <!-- Section 3 -->
+  <section id="step-by-step">
+    <h2>3. Detailed Step-by-Step Flow</h2>
+
+    <div class="flow-steps">
+      <div class="flow-step">
+        <div class="step-number">1</div>
+        <div class="step-content">
+          <div class="step-header">Mobile UI & State Management (Flutter)</div>
+          <div class="step-body">
+            User submits a question in <code>HealthChatScreen</code>. The screen appends the user message to <code>ChatMessagesNotifier</code> (Riverpod), displays a typing indicator, and collects the previous 6 message turns as <code>conversation_history</code>.
+          </div>
+        </div>
+      </div>
+
+      <div class="flow-step">
+        <div class="step-number">2</div>
+        <div class="step-content">
+          <div class="step-header">Self-Healing Network Request (ApiService)</div>
+          <div class="step-body">
+            <code>ApiService</code> resolves the dynamic LAN backend URL (via <code>--dart-define=API_BASE_URL</code>). If no token exists or if the server returns <code>401 Unauthorized</code> (e.g. token expired), it automatically provisions a fresh guest token via <code>loginAnonymously()</code> and retries the request once.
+          </div>
+        </div>
+      </div>
+
+      <div class="flow-step">
+        <div class="step-number">3</div>
+        <div class="step-content">
+          <div class="step-header">Backend Routing & Authentication (FastAPI)</div>
+          <div class="step-body">
+            <code>POST /api/v1/ai/chat</code> receives the request. The <code>get_current_user</code> dependency validates the JWT Bearer token against PostgreSQL, identifying the authenticated user ID.
+          </div>
+        </div>
+      </div>
+
+      <div class="flow-step">
+        <div class="step-number">4</div>
+        <div class="step-content">
+          <div class="step-header">RAG Context Assembly (rag.py)</div>
+          <div class="step-body">
+            The backend builds a live snapshot from PostgreSQL containing:
+            <ul>
+              <li><strong>Active Medications:</strong> Name, dosage, schedule times, inventory, intake notes.</li>
+              <li><strong>Adherence Logs:</strong> Scheduled vs. actual taken times from the past 7 days.</li>
+              <li><strong>Prescriptions:</strong> OCR extracts and doctor notes from uploaded documents.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div class="flow-step">
+        <div class="step-number">5</div>
+        <div class="step-content">
+          <div class="step-header">Grounded LLM Generation (OpenRouter)</div>
+          <div class="step-body">
+            The health records are injected into the LLM system prompt. OpenRouter invokes <code>meta-llama/llama-3.3-70b-instruct</code> with temperature <code>0.3</code>. If no API key is configured, a local fallback summary is returned.
+          </div>
+        </div>
+      </div>
+
+      <div class="flow-step">
+        <div class="step-number">6</div>
+        <div class="step-content">
+          <div class="step-header">Markdown Rendering & Tap-to-Retry UI</div>
+          <div class="step-body">
+            The response is returned to the phone and rendered using <code>MarkdownBody</code>. If a network drop or inference error occurs, a red error banner with an interactive <strong>"Tap to retry"</strong> button appears, and tapping the failed message allows editing.
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Section 4 -->
+  <section id="data-gap">
+    <h2>4. The "Local SQLite vs. Cloud Postgres" Gap</h2>
+
+    <div class="callout callout-warning">
+      <strong>Important Root Cause:</strong> Gobi is built as an offline-first mobile application. Medications added or seeded on the phone live in <strong>local SQLite (Drift)</strong>. The AI backend RAG queries <strong>cloud PostgreSQL</strong>.
+    </div>
+
+    <p>If you see medications in your mobile app UI, but the AI responds with <em>"You currently don't have any active medications scheduled"</em>, here is why:</p>
+
+    <div class="kv-grid">
+      <div class="kv-card">
+        <div class="kv-title">Local SQLite Storage</div>
+        <div class="kv-value">Drift Database (On Device)</div>
+        <div class="kv-desc">Powers the Medications tab, Dose History charts, and offline tracking. Seeded test datasets live here.</div>
+      </div>
+      <div class="kv-card">
+        <div class="kv-title">Cloud PostgreSQL Storage</div>
+        <div class="kv-value">PostgreSQL (gobi-postgres)</div>
+        <div class="kv-desc">Queried by the backend RAG builder when constructing the AI's prompt context.</div>
+      </div>
+    </div>
+
+    <p>When you create a medication in the app, <code>MedicationsRepository</code> writes to local SQLite immediately and fires an asynchronous background sync to PostgreSQL (<code>_backgroundCloudCreate</code>). If that sync failed or if sample data was only hydrated into local SQLite, PostgreSQL remains empty.</p>
+  </section>
+
+  <!-- Section 5 -->
+  <section id="troubleshooting">
+    <h2>5. Why It Might Not Be Working As Intended</h2>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Observed Symptom</th>
+          <th>Root Cause</th>
+          <th>Expected Behavior & Fix</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>AI says "No active medications found"</strong></td>
+          <td>Medications exist only in local SQLite, not synced to backend PostgreSQL.</td>
+          <td>Add medications while connected to the backend, or trigger cloud sync via <code>MedicationsRepository.syncWithCloud()</code>.</td>
+        </tr>
+        <tr>
+          <td><strong>AI doesn't add meds or check off doses</strong></td>
+          <td>Using <code>/ai/chat</code> (Q&A only) instead of <code>/ai/parse-intent</code> (Actions).</td>
+          <td>The Chat screen is an informational assistant. To mutate data via voice/speech, use the Voice Assistant mic which triggers tool calling.</td>
+        </tr>
+        <tr>
+          <td><strong>Chat gives a 401 Unauthorized error</strong></td>
+          <td>Stale token or app booted before backend was reachable.</td>
+          <td>Our updated <code>ApiService</code> now auto-refreshes tokens and retries on 401 automatically.</td>
+        </tr>
+        <tr>
+          <td><strong>Responses take 5 to 10 seconds</strong></td>
+          <td>70B LLM inference latency over OpenRouter.</td>
+          <td>Normal for high-parameter models (<code>llama-3.3-70b-instruct</code>). A typing indicator is displayed during generation.</td>
+        </tr>
+        <tr>
+          <td><strong>Red error card: "Request failed"</strong></td>
+          <td>Network disconnection or OpenRouter API quota/key issue.</td>
+          <td>Check backend container logs. Tap the red <strong>"Tap to retry"</strong> button once network is restored.</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- Section 6 -->
+  <section id="diagnostics">
+    <h2>6. Debugging & Verification Checklist</h2>
+    <p>Run these three commands from your terminal to verify every tier of the AI system:</p>
+
+    <h3>1. Check Backend Debug Logs in Real-Time</h3>
+    <pre><code>docker compose -f backend-api/docker-compose.yml logs -f backend</code></pre>
+    <p>Look for structured entries like <code>--> POST /api/v1/ai/chat</code>, query timings in <code>[ms]</code>, and OpenRouter prompt dispatches.</p>
+
+    <h3>2. Run the AI Chat Sanity Smoke Test</h3>
+    <pre><code>make smoke-chat</code></pre>
+    <p>Tests backend health, guest authentication, and runs a live grounded query against the AI chat endpoint.</p>
+
+    <h3>3. Run Automated Flutter & Backend Test Suites</h3>
+    <pre><code># Mobile unit & smoke tests (24 tests)
+cd gobi-mobile && flutter test
+
+# Backend pytest suite (5 tests)
+docker compose -f backend-api/docker-compose.yml exec backend pytest</code></pre>
+  </section>
+
+  <footer>
+    Project Gobi Architecture Documentation &bull; Generated for Pair Programming Reference
+  </footer>
+
+</div>
+
+</body>
+</html>
