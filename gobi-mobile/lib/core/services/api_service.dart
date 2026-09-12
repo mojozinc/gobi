@@ -3,11 +3,13 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../config/app_config.dart';
+import '../models/backend_health.dart';
 
 class ApiService {
   final String baseUrl;
   final SharedPreferences? prefs;
   final http.Client _client;
+  final ValueNotifier<BackendHealth?> lastKnownHealth = ValueNotifier<BackendHealth?>(null);
   String? _token;
   Map<String, dynamic>? _user;
 
@@ -311,5 +313,45 @@ class ApiService {
       throw Exception(resData['detail'] ?? 'Undo dose failed');
     }
     return resData;
+  }
+
+  /// Checks the health and liveness of the backend API.
+  Future<BackendHealth> checkHealth({Duration timeout = const Duration(seconds: 4)}) async {
+    final url = '$baseUrl/health';
+    final uri = Uri.parse(url);
+    final stopwatch = Stopwatch()..start();
+
+    debugPrint('[ApiService] 🔍 checkHealth calling $uri');
+    try {
+      final res = await _client.get(uri).timeout(timeout);
+      stopwatch.stop();
+      final latencyMs = stopwatch.elapsedMilliseconds;
+      debugPrint('[ApiService] 📥 checkHealth response ${res.statusCode} (${latencyMs}ms)');
+
+      if (res.statusCode == 200) {
+        final data = jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+        final health = BackendHealth.fromJson(data, latencyMs: latencyMs, targetUrl: url);
+        lastKnownHealth.value = health;
+        return health;
+      } else {
+        final health = BackendHealth.offline(
+          errorMessage: 'HTTP ${res.statusCode}: ${res.reasonPhrase}',
+          latencyMs: latencyMs,
+          targetUrl: url,
+        );
+        lastKnownHealth.value = health;
+        return health;
+      }
+    } catch (e) {
+      stopwatch.stop();
+      debugPrint('[ApiService] ❌ checkHealth failed for $uri: $e');
+      final health = BackendHealth.offline(
+        errorMessage: e.toString(),
+        latencyMs: stopwatch.elapsedMilliseconds,
+        targetUrl: url,
+      );
+      lastKnownHealth.value = health;
+      return health;
+    }
   }
 }

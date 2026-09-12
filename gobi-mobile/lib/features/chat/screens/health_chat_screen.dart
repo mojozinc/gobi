@@ -2,9 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/dev/dev_only.dart';
 import '../../../core/providers/app_providers.dart';
+import '../../../core/providers/dev_providers.dart';
 import '../../../core/services/api_service.dart';
 import '../../../core/services/voice_service.dart';
+import '../widgets/dev_server_status_chip.dart';
 
 class HealthChatScreen extends ConsumerStatefulWidget {
   final ApiService apiService;
@@ -33,6 +36,14 @@ class _HealthChatScreenState extends ConsumerState<HealthChatScreen> {
     'Summarize my prescription schedule',
     'Any instructions for my meds?',
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(backendHealthProvider.notifier).refreshHealth();
+    });
+  }
 
   @override
   void dispose() {
@@ -169,15 +180,18 @@ class _HealthChatScreenState extends ConsumerState<HealthChatScreen> {
           .map((m) => m.toApiMap())
           .toList();
 
+      final stopwatch = Stopwatch()..start();
       final res = await widget.apiService.sendHealthChat(
         text,
         dependentId: widget.dependentId,
         history: history,
       );
+      stopwatch.stop();
 
       final reply = res['response'] as String? ?? 'No response received.';
 
       if (mounted) {
+        ref.read(backendHealthProvider.notifier).markHealthy(latencyMs: stopwatch.elapsedMilliseconds);
         ref.read(chatMessagesProvider.notifier).addMessage(
               ChatMessage(text: reply, isUser: false),
             );
@@ -231,6 +245,12 @@ class _HealthChatScreenState extends ConsumerState<HealthChatScreen> {
           ],
         ),
         actions: [
+          DevOnly(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
+              child: DevServerStatusChip(apiService: widget.apiService),
+            ),
+          ),
           IconButton(
             icon: const Icon(Icons.refresh),
             tooltip: 'New Chat / Clear',
