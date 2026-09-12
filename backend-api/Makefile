@@ -1,4 +1,4 @@
-.PHONY: run test install docker-build
+.PHONY: run test install docker-build docker-up docker-down docker-watch
 
 install:
 	pip install -r requirements.txt
@@ -11,3 +11,12 @@ test:
 
 docker-build:
 	docker build -t gobi-backend-api:latest .
+
+docker-up:
+	docker compose up -d
+
+docker-down:
+	docker compose down
+
+docker-watch:
+	docker compose up --watch

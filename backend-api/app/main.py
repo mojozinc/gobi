@@ -1,9 +1,11 @@
 import logging
 import time
+from datetime import datetime, timezone
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
+from sqlalchemy import text
 from app.config import settings
 from app.db.session import engine, Base
 from app.api.auth import router as auth_router
@@ -86,12 +88,35 @@ else:
 
 # Health Check
 @app.get("/health")
+@app.get("/api/v1/health")
 async def health_check():
+    db_status = "connected"
+    db_error = None
+    try:
+        async with engine.connect() as conn:
+            await conn.execute(text("SELECT 1"))
+    except Exception as e:
+        logger.warning(f"Health check DB ping failed: {e}")
+        db_status = "error"
+        db_error = str(e)
+
+    ai_configured = bool(settings.OPENROUTER_API_KEY and settings.OPENROUTER_API_KEY.strip())
+
     return {
-        "status": "healthy",
+        "status": "healthy" if db_status == "connected" else "degraded",
         "service": "gobi-backend-api",
         "env": settings.ENV,
-        "version": settings.VERSION
+        "version": settings.VERSION,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "database": {
+            "status": db_status,
+            "error": db_error,
+        },
+        "ai": {
+            "status": "ready" if ai_configured else "mock",
+            "provider": "openrouter" if ai_configured else "local-mock",
+            "model": settings.OPENROUTER_TEXT_MODEL,
+        }
     }
 
 # Register API v1 routers
