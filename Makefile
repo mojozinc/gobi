@@ -30,6 +30,9 @@ up:
 down:
 	docker compose -f backend-api/docker-compose.yml down
 
+watch-backend:
+	docker compose -f backend-api/docker-compose.yml up --watch
+
 # Print resolved URL
 ip:
 	@echo $(API_URL)
@@ -37,4 +40,9 @@ ip:
 # AI Chat API Smoke Test
 smoke-chat:
 	@./scripts/smoke_test_chat.sh
+
+# Cloudflare Tunnel for Backend API
+tunnel:
+	@echo "Starting Cloudflare Quick Tunnel on http://localhost:8000..."
+	cloudflared tunnel --url http://localhost:8000
 
