@@ -1,4 +1,4 @@
-import '../data/local/test_data_hydrator.dart' if (dart.library.io) 'package:gobi_mobile/data/local/test_data_hydrator.dart';
+import 'package:gobi_mobile/data/local/test_data_hydrator.dart';
 import 'package:gobi_mobile/data/local/app_database.dart';
 
 class TestDataFixtures {

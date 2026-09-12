@@ -119,7 +119,7 @@ void main() {
   });
 
   testWidgets('Long pressing medication card opens action menu with Edit, Pause, and Delete', (WidgetTester tester) async {
-    final medId = await repository.addMedication({
+    await repository.addMedication({
       'name': 'Metformin',
       'dosage': '500mg',
       'frequency': 'twice daily',
