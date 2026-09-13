@@ -46,3 +46,15 @@ tunnel:
 	@echo "Starting Cloudflare Quick Tunnel on http://localhost:8000..."
 	cloudflared tunnel --url http://localhost:8000
 
+# Deploy Backend to Google Cloud Run
+GCP_REGION ?= europe-west1
+GCP_SERVICE ?= gobi-backend
+
+deploy-backend:
+	@echo "Deploying $(GCP_SERVICE) to Google Cloud Run ($(GCP_REGION))..."
+	cd backend-api && gcloud run deploy $(GCP_SERVICE) \
+		--source . \
+		--region $(GCP_REGION) \
+		--allow-unauthenticated
+
+

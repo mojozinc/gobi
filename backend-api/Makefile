@@ -20,3 +20,15 @@ docker-down:
 
 docker-watch:
 	docker compose up --watch
+
+# Google Cloud Run Deployment
+GCP_REGION ?= europe-west1
+GCP_SERVICE ?= gobi-backend
+
+deploy:
+	@echo "Deploying $(GCP_SERVICE) to Google Cloud Run ($(GCP_REGION))..."
+	gcloud run deploy $(GCP_SERVICE) \
+		--source . \
+		--region $(GCP_REGION) \
+		--allow-unauthenticated
+
