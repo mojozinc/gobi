@@ -180,12 +180,16 @@ From the root repository directory:
 ```bash
 make up             # Launch backend services
 make down           # Stop backend services
-make run            # Launch mobile app
+make emulator       # Launch Android Emulator GUI window
+make run-emulator   # Build and run mobile app on Android emulator (http://10.0.2.2:8000)
+make adb-fix        # Restart ADB daemon on port 5038 (resolves Windows port 5037 errors)
+make run            # Launch mobile app (dynamic LAN IP)
 make codegen        # Run code generation for Drift & Hive
 make watch-codegen  # Watch table changes and auto-regenerate
 make test           # Run all Flutter unit & widget tests
 make clean          # Clean mobile build artifacts
 ```
+
 
 ## 🔧 Detailed Setup
 

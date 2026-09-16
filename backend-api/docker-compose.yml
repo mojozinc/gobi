@@ -22,12 +22,11 @@ services:
     ports:
       - "8000:8000"
     environment:
-      PORT: 8000
-      ENV: development
+      ENV: ${ENV:-development}
       LOG_LEVEL: ${LOG_LEVEL:-DEBUG}
-      DATABASE_URL: postgresql+asyncpg://gobi:gobi_password@postgres:5432/gobi_db
-      JWT_SECRET: dev-secret-change-in-production
-      JWT_EXPIRY_HOURS: 72
+      DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://gobi:gobi_password@postgres:5432/gobi_db}
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-change-in-production}
+      JWT_EXPIRY_HOURS: ${JWT_EXPIRY_HOURS:-72}
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
       OPENROUTER_TEXT_MODEL: ${OPENROUTER_TEXT_MODEL:-meta-llama/llama-3.3-70b-instruct}
       OPENROUTER_VISION_MODEL: ${OPENROUTER_VISION_MODEL:-google/gemini-3.8-flash}
