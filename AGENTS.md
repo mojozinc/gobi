@@ -13,3 +13,10 @@
 - **Configurable `LOG_LEVEL`**: Backend services must default to `LOG_LEVEL=DEBUG` in development, exposed through `docker-compose.yml` and `Settings`.
 - **Request Logging Middleware**: All incoming requests, latencies (ms), client IPs, and status codes >= 400 must be explicitly logged with structured timestamps.
 - **External AI Service Diagnostics**: When calling OpenRouter or third-party LLMs, log model selection, token responses, and full upstream error payloads upon failure.
+
+## 4. Reproducible Environment & Makefile Shortcuts
+- **Launch Emulator**: Use `make emulator` to launch the Android emulator GUI window with custom `ANDROID_AVD_HOME=D:/android-avds` and `ANDROID_ADB_SERVER_PORT=5038`.
+- **Run App on Emulator**: Use `make run-emulator` to build and run the Flutter app on `emulator-5554` targeting `http://10.0.2.2:8000`.
+- **ADB Port Resolution**: Use `make adb-fix` to restart ADB on port `5038` whenever default port `5037` reports connection refusal or socket errors.
+- **Kotlin Incremental Build Configuration**: Maintain `kotlin.incremental=false` and `kotlin.incremental.useClasspathSnapshot=false` in `android/gradle.properties` to prevent Kotlin compiler `FilePageCache` locking errors (`Storage for [...file-to-id.tab] is already registered`) when Flutter Android plugin subprojects (`image_picker_android`, `speech_to_text`, `shared_preferences_android`) compile in parallel on Windows.
+
